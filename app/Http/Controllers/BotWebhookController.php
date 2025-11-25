@@ -498,57 +498,37 @@ use Illuminate\Support\Facades\Http;
 class BotWebhookController extends Controller
 {
     public function handle(Request $request)
-    {
-        // 1️⃣ WEBHOOK VERIFICATION (GET)
-        if ($request->isMethod('get')) {
-            $mode      = $request->input('hub_mode') ?? $request->input('hub.mode');
-            $sentToken = $request->input('hub_verify_token') ?? $request->input('hub.verify_token');
-            $challenge = $request->input('hub_challenge') ?? $request->input('hub.challenge');
+        {
+            // 👇 Use ONE fixed verify token for now
+            $myVerifyToken = 'SGTHJhgdssdnhsbdhdnHDFNBSH';   // EXACTLY same as in Meta
 
-            // Look up your settings row by verify_token from Meta
-            $settings = Setting::where('verify_token', $sentToken)->first();
+            // 1) WEBHOOK VERIFICATION (GET)
+            if ($request->isMethod('get')) {
+                // Laravel converts dots in query params to underscores:
+                // hub.mode => hub_mode, etc.
+                $mode      = $request->query('hub_mode');
+                $sentToken = $request->query('hub_verify_token');
+                $challenge = $request->query('hub_challenge');
 
-            if ($mode === 'subscribe' && $settings) {
-                // Must return challenge as plain text
-                return response($challenge, 200);
+                Log::info('Webhook VERIFY', [
+                    'mode'       => $mode,
+                    'sent_token' => $sentToken,
+                    'challenge'  => $challenge,
+                ]);
+
+                if ($mode === 'subscribe' && $sentToken === $myVerifyToken) {
+                    // ✅ MUST return the challenge as plain text with 200
+                    return response($challenge, 200);
+                }
+
+                return response('Invalid verify token', 403);
             }
 
-            return response('Invalid verify token', 403);
+            // 2) NORMAL WEBHOOK POST (messages, statuses)
+            Log::info('Webhook POST payload', $request->all());
+
+            return response()->json(['status' => 'ok']);
         }
-
-        // 2️⃣ INCOMING MESSAGE (POST)
-        $payload = $request->all();
-
-        $message = data_get($payload, 'entry.0.changes.0.value.messages.0');
-        
-        if (! $message) {
-            return response()->json(['status' => 'ignored']);
-        }
-
-        $from = $message['from'] ?? null;
-        $text = $message['text']['body'] ?? '';
-
-        if (! $from) {
-            return response()->json(['status' => 'no-from']);
-        }
-
-        // Get settings from something in payload (e.g. phone_number_id) or single row
-        $settings = Setting::first(); // temporary simple version
-
-        $conversation = Conversation::firstOrCreate(
-            [
-                'user_id' => $settings->user_id,
-                'phone'   => $from,
-            ],
-            ['step' => 'start']
-        );
-
-        $reply = $this->getReplyForMessage($conversation, trim($text));
-
-        $this->sendWhatsAppText($settings, $from, $reply);
-
-        return response()->json(['status' => 'ok']);
-    }
 
     // keep your getReplyForMessage() and sendWhatsAppText() as you already have
 }
