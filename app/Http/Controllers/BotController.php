@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\BotSetting;
 use App\Models\Setting;
+use App\Models\Conversation;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 
@@ -26,8 +27,8 @@ class BotController extends Controller
         $conversations = Conversation::where('user_id', $userId)
             ->orderByDesc('id')
             ->paginate(20); // pagination
-
-        return view('bot-settings', [
+        //  dd($conversations); die;
+        return view('bot_flows.bot-settings', [
             'settings'       => $settings,
             'conversations'  => $conversations,
         ]);

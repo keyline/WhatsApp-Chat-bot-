@@ -8,7 +8,7 @@
 
     {{-- Webhook info --}}
     <div class="card mb-4">
-        <div class="card-header">
+        {{-- <div class="card-header">
             Webhook Configuration
         </div>
         <div class="card-body">
@@ -18,7 +18,7 @@
             <p class="mt-3"><strong>Verify Token:</strong></p>
             <code>{{ $settings->verify_token }}</code>
         </div>
-    </div>
+    </div> --}}
 
     {{-- Conversations table --}}
     <div class="card">
