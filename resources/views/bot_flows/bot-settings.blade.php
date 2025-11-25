@@ -142,28 +142,23 @@
   </div>
 </div>
 
-    @push('scripts')
-    <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const modal = document.getElementById('sendMessageModal');
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const modal = document.getElementById('sendMessageModal');
 
-        if (!modal) return;
+    modal.addEventListener('show.bs.modal', function (event) {
+        const button = event.relatedTarget; // The button that opened the modal
+        const phone  = button.getAttribute('data-phone') || '';
 
-        modal.addEventListener('show.bs.modal', function (event) {
-            const button = event.relatedTarget;
-            const phone  = button.getAttribute('data-phone') || '';
+        let formatted = phone.trim();
+        if (formatted && !formatted.startsWith('+')) {
+            formatted = '+' + formatted;
+        }
 
-            const input = modal.querySelector('#messagePhone');
-
-            let formatted = phone.trim();
-            if (formatted && !formatted.startsWith('+')) {
-                formatted = '+' + formatted;
-            }
-
-            input.value = formatted;
-        });
+        document.getElementById('messagePhone').value = formatted;
     });
-    </script>
-    @endpush
+   });
+</script>
+
 
 @endsection
