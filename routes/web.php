@@ -40,8 +40,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/messages/send', [MessageController::class, 'store'])->name('messages.store');
 
     // Bot flow url & token settings
-    Route::get('/bot-settings', [BotController::class, 'edit'])->name('bot.settings.edit');
-    Route::post('/bot-settings', [BotController::class, 'update'])->name('bot.settings.update');
+    Route::get('/bot-settings', [BotController::class, 'dashboard'])->name('bot.settings.dashboard');
+    // Route::post('/bot-settings', [BotController::class, 'update'])->name('bot.settings.update');
 });
 
 // Default home redirect

@@ -9,44 +9,44 @@ use Illuminate\Support\Str;
 
 class BotController extends Controller
 {
-    // public function index()
-    // {
-    //     // If you use auth, filter by logged in user
-    //     $userId = Auth::id();
+     public function dashboard()
+   {
+        $userId = auth()->id(); // or however you store current user
 
-    //     $bots = BotSetting::when($userId, fn($q) => $q->where('user_id', $userId))
-    //         ->orderBy('created_at', 'desc')
-    //         ->get();
-
-    //     return view('bot_flows.index', compact('bots'));
-    // }
-
-     public function edit()
-    {
-        $user = Auth::user();
-
+        // Bot / webhook settings for this user
         $settings = Setting::firstOrCreate(
-            ['user_id' => $user->id],
+            ['user_id' => $userId],
             ['verify_token' => Str::random(32)]
         );
 
-        $webhookUrl = route('bot.webhook', ['token' => $settings->verify_token]);
+        // Your webhook URL (from earlier)
+        $webhookUrl = route('bot.webhook', ['token' => $settings->bot_token]);
 
-        return view('bot-settings', compact('settings', 'webhookUrl'));
-    }
+        // All conversations for this user
+        $conversations = Conversation::where('user_id', $userId)
+            ->orderByDesc('id')
+            ->paginate(20); // pagination
 
-    public function update(Request $request)
-    {
-        $request->validate([
-            'bot_token' => ['required', 'string', 'min:8', 'max:64', 'alpha_dash'],
+        return view('bot-settings', [
+            'settings'       => $settings,
+            'webhookUrl'     => $webhookUrl,
+            'conversations'  => $conversations,
         ]);
+   }
 
-        $settings = Setting::where('user_id', Auth::id())->firstOrFail();
-        $settings->verify_token = $request->verify_token;
-        $settings->save();
 
-        return redirect()
-            ->route('bot.settings.edit')
-            ->with('success', 'Bot token updated successfully.');
-    }
+    // public function update(Request $request)
+    // {
+    //     $request->validate([
+    //         'bot_token' => ['required', 'string', 'min:8', 'max:64', 'alpha_dash'],
+    //     ]);
+
+    //     $settings = Setting::where('user_id', Auth::id())->firstOrFail();
+    //     $settings->verify_token = $request->verify_token;
+    //     $settings->save();
+
+    //     return redirect()
+    //         ->route('bot.settings.edit')
+    //         ->with('success', 'Bot token updated successfully.');
+    // }
 }
