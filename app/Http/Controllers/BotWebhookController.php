@@ -12,8 +12,10 @@ class BotWebhookController extends Controller
 {
     public function handle(Request $request)
     {
+        $userId = Auth::id();
+        $settings = Setting::where('user_id', $userId)->first();
         // Secret used ONLY for webhook verification
-        $myVerifyToken = env('WHATSAPP_VERIFY_TOKEN');
+        $myVerifyToken = $settings->verify_token;
 
         /**
          * 1) META WEBHOOK VERIFICATION (GET)
