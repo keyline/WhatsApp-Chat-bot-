@@ -41,7 +41,8 @@ Route::middleware('auth')->group(function () {
 
     // Bot flow url & token settings
     Route::get('/bot-settings', [BotController::class, 'dashboard'])->name('bot.settings.dashboard');
-    // Route::post('/bot-settings', [BotController::class, 'update'])->name('bot.settings.update');
+    Route::post('/bot/send-message', [BotController::class, 'sendManualMessage'])
+    ->name('bot.sendMessage');
 });
 
 // Default home redirect

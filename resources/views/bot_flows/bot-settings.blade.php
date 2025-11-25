@@ -60,8 +60,17 @@
                                 <td>{{ $conv->email }}</td>
                                 <td>{{ $conv->created_at }}</td>
                                 <td>
-                                    <a href="#" class="btn btn-primary">Message</a>
+                                    <button
+                                        type="button"
+                                        class="btn btn-primary btn-sm btn-message"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#sendMessageModal"
+                                        data-phone="{{ $conv->phone }}"
+                                    >
+                                        Message
+                                    </button>
                                 </td>
+
                             </tr>
                         @empty
                             <tr>
@@ -83,4 +92,78 @@
     </div>
 
 </div>
+
+
+{{-- Send Message Modal --}}
+<div class="modal fade" id="sendMessageModal" tabindex="-1" aria-labelledby="sendMessageModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <h5 class="modal-title" id="sendMessageModalLabel">Send WhatsApp Message</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <form method="POST" action="{{ route('bot.sendMessage') }}">
+        @csrf
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">To (WhatsApp Number)</label>
+            <input
+                type="text"
+                name="phone"
+                id="messagePhone"
+                class="form-control"
+                readonly
+            >
+            <small class="text-muted">
+                This is the user's WhatsApp number (with + added automatically).
+            </small>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Message</label>
+            <textarea
+                name="message"
+                class="form-control"
+                rows="4"
+                required
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="submit" class="btn btn-success">Send</button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+
+    @push('scripts')
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const modal = document.getElementById('sendMessageModal');
+
+        if (!modal) return;
+
+        modal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const phone  = button.getAttribute('data-phone') || '';
+
+            const input = modal.querySelector('#messagePhone');
+
+            let formatted = phone.trim();
+            if (formatted && !formatted.startsWith('+')) {
+                formatted = '+' + formatted;
+            }
+
+            input.value = formatted;
+        });
+    });
+    </script>
+    @endpush
+
 @endsection
