@@ -20,7 +20,7 @@ class BotController extends Controller
         );
 
         // Your webhook URL (from earlier)
-        $webhookUrl = route('bot.webhook', ['token' => $settings->bot_token]);
+        // $webhookUrl = route('bot.webhook', ['token' => $settings->bot_token]);
 
         // All conversations for this user
         $conversations = Conversation::where('user_id', $userId)
@@ -29,7 +29,6 @@ class BotController extends Controller
 
         return view('bot-settings', [
             'settings'       => $settings,
-            'webhookUrl'     => $webhookUrl,
             'conversations'  => $conversations,
         ]);
    }
