@@ -379,6 +379,117 @@ namespace App\Http\Controllers;
 // }
 
 
+// use App\Models\Setting;
+// use App\Models\Conversation;
+// use Illuminate\Http\Request;
+// use Illuminate\Support\Facades\Http;
+
+// class BotWebhookController extends Controller
+// {
+//     public function handle(Request $request, string $token)
+//     {
+//         // Find settings row by verify_token coming from URL
+//         $settings = Setting::where('verify_token', $token)->first();
+
+//         // If nothing matches this URL token, reject
+//         if (! $settings) {
+//             return response()->json(['error' => 'Invalid webhook token'], 401);
+//         }
+
+//         /**
+//          * 1️⃣ META WEBHOOK VERIFICATION (GET)
+//          *    Meta calls this when you first 'Verify and Save' the webhook.
+//          */
+//         if ($request->isMethod('get')) {
+//             $mode      = $request->input('hub_mode') ?? $request->input('hub.mode');
+//             $sentToken = $request->input('hub_verify_token') ?? $request->input('hub.verify_token');
+//             $challenge = $request->input('hub_challenge') ?? $request->input('hub.challenge');
+
+//             // Check mode and verify_token
+//             if ($mode === 'subscribe' && $sentToken === $settings->verify_token) {
+//                 // Must return challenge as plain text with 200 status
+//                 return response($challenge, 200);
+//             }
+
+//             return response('Invalid verify token', 403);
+//         }
+
+//         /**
+//          * 2️⃣ INCOMING WHATSAPP MESSAGE (POST)
+//          *    Meta sends this whenever a user sends a message.
+//          */
+//         $payload = $request->all();
+
+//         // Safely extract the first message from the payload
+//         $message = data_get($payload, 'entry.0.changes.0.value.messages.0');
+
+//         if (! $message) {
+//             // Nothing interesting in this webhook – just acknowledge
+//             return response()->json(['status' => 'ignored']);
+//         }
+
+//         $from = $message['from'] ?? null;
+//         $text = $message['text']['body'] ?? '';
+
+//         if (! $from) {
+//             return response()->json(['status' => 'no-from']);
+//         }
+
+//         // 3️⃣ Find or create a conversation for this user & phone
+//         $conversation = Conversation::firstOrCreate(
+//             [
+//                 'user_id' => $settings->user_id,
+//                 'phone'   => $from,
+//             ],
+//             [
+//                 'step' => 'start',
+//             ]
+//         );
+
+//         // 4️⃣ Decide reply based on conversation state
+//         $reply = $this->getReplyForMessage($conversation, trim($text));
+
+//         // 5️⃣ Send reply back via WhatsApp Cloud API
+//         $this->sendWhatsAppText($settings, $from, $reply);
+
+//         return response()->json(['status' => 'ok']);
+//     }
+
+//     // ... keep your getReplyForMessage() exactly as you already have ...
+
+//     protected function contactIntro(): string
+//     {
+//         return "Thank you for the details! To assist you further, may I have your basic contact information?\n"
+//             . "Please share the following one by one.";
+//     }
+
+//     protected function sendWhatsAppText(Setting $settings, string $to, string $text): void
+//     {
+//         $phoneNumberId = $settings->phone_number_id;  // matches your DB column
+//         $accessToken   = $settings->access_token;     // matches your DB column
+
+//         if (! $phoneNumberId || ! $accessToken) {
+//             return; // or log an error
+//         }
+
+//         $url = "https://graph.facebook.com/v21.0/{$phoneNumberId}/messages";
+
+//         Http::withToken($accessToken)->post($url, [
+//             "messaging_product" => "whatsapp",
+//             "to"                => $to,
+//             "type"              => "text",
+//             "text"              => [
+//                 "preview_url" => false,
+//                 "body"        => $text,
+//             ],
+//         ]);
+//     }
+// }
+
+
+
+
+
 use App\Models\Setting;
 use App\Models\Conversation;
 use Illuminate\Http\Request;
@@ -386,45 +497,31 @@ use Illuminate\Support\Facades\Http;
 
 class BotWebhookController extends Controller
 {
-    public function handle(Request $request, string $token)
+    public function handle(Request $request)
     {
-        // Find settings row by verify_token coming from URL
-        $settings = Setting::where('verify_token', $token)->first();
-
-        // If nothing matches this URL token, reject
-        if (! $settings) {
-            return response()->json(['error' => 'Invalid webhook token'], 401);
-        }
-
-        /**
-         * 1️⃣ META WEBHOOK VERIFICATION (GET)
-         *    Meta calls this when you first 'Verify and Save' the webhook.
-         */
+        // 1️⃣ WEBHOOK VERIFICATION (GET)
         if ($request->isMethod('get')) {
             $mode      = $request->input('hub_mode') ?? $request->input('hub.mode');
             $sentToken = $request->input('hub_verify_token') ?? $request->input('hub.verify_token');
             $challenge = $request->input('hub_challenge') ?? $request->input('hub.challenge');
 
-            // Check mode and verify_token
-            if ($mode === 'subscribe' && $sentToken === $settings->verify_token) {
-                // Must return challenge as plain text with 200 status
+            // Look up your settings row by verify_token from Meta
+            $settings = Setting::where('verify_token', $sentToken)->first();
+
+            if ($mode === 'subscribe' && $settings) {
+                // Must return challenge as plain text
                 return response($challenge, 200);
             }
 
             return response('Invalid verify token', 403);
         }
 
-        /**
-         * 2️⃣ INCOMING WHATSAPP MESSAGE (POST)
-         *    Meta sends this whenever a user sends a message.
-         */
+        // 2️⃣ INCOMING MESSAGE (POST)
         $payload = $request->all();
 
-        // Safely extract the first message from the payload
         $message = data_get($payload, 'entry.0.changes.0.value.messages.0');
-
+        
         if (! $message) {
-            // Nothing interesting in this webhook – just acknowledge
             return response()->json(['status' => 'ignored']);
         }
 
@@ -435,55 +532,23 @@ class BotWebhookController extends Controller
             return response()->json(['status' => 'no-from']);
         }
 
-        // 3️⃣ Find or create a conversation for this user & phone
+        // Get settings from something in payload (e.g. phone_number_id) or single row
+        $settings = Setting::first(); // temporary simple version
+
         $conversation = Conversation::firstOrCreate(
             [
                 'user_id' => $settings->user_id,
                 'phone'   => $from,
             ],
-            [
-                'step' => 'start',
-            ]
+            ['step' => 'start']
         );
 
-        // 4️⃣ Decide reply based on conversation state
         $reply = $this->getReplyForMessage($conversation, trim($text));
 
-        // 5️⃣ Send reply back via WhatsApp Cloud API
         $this->sendWhatsAppText($settings, $from, $reply);
 
         return response()->json(['status' => 'ok']);
     }
 
-    // ... keep your getReplyForMessage() exactly as you already have ...
-
-    protected function contactIntro(): string
-    {
-        return "Thank you for the details! To assist you further, may I have your basic contact information?\n"
-            . "Please share the following one by one.";
-    }
-
-    protected function sendWhatsAppText(Setting $settings, string $to, string $text): void
-    {
-        $phoneNumberId = $settings->phone_number_id;  // matches your DB column
-        $accessToken   = $settings->access_token;     // matches your DB column
-
-        if (! $phoneNumberId || ! $accessToken) {
-            return; // or log an error
-        }
-
-        $url = "https://graph.facebook.com/v21.0/{$phoneNumberId}/messages";
-
-        Http::withToken($accessToken)->post($url, [
-            "messaging_product" => "whatsapp",
-            "to"                => $to,
-            "type"              => "text",
-            "text"              => [
-                "preview_url" => false,
-                "body"        => $text,
-            ],
-        ]);
-    }
+    // keep your getReplyForMessage() and sendWhatsAppText() as you already have
 }
-
-
