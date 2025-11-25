@@ -13,7 +13,7 @@ class BotWebhookController extends Controller
     public function handle(Request $request)
     {
         // Secret used ONLY for webhook verification
-        $myVerifyToken = env('WHATSAPP_VERIFY_TOKEN');
+        $myVerifyToken = env('WHATSAPP_WEBHOOK_VERIFY_TOKEN');
 
         /**
          * 1) META WEBHOOK VERIFICATION (GET)
