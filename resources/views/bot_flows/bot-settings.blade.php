@@ -30,7 +30,7 @@
                 <table class="table table-striped mb-0">
                     <thead>
                         <tr>
-                            <th>ID</th>
+                            <th>Sl. No.</th>
                             <th>Phone</th>
                             <th>Step</th>
                             <th>Service</th>
@@ -41,12 +41,14 @@
                             <th>Contact Number</th>
                             <th>Email</th>
                             <th>Created At</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
+                        @php $i = 1; @endphp
                         @forelse($conversations as $conv)
                             <tr>
-                                <td>{{ $conv->id }}</td>
+                                <td><?php echo $i; $i++; ?></td>
                                 <td>{{ $conv->phone }}</td>
                                 <td>{{ $conv->step }}</td>
                                 <td>{{ $conv->service }}</td>
@@ -57,6 +59,9 @@
                                 <td>{{ $conv->contact_number }}</td>
                                 <td>{{ $conv->email }}</td>
                                 <td>{{ $conv->created_at }}</td>
+                                <td>
+                                    <a href="#" class="btn btn-primary">Message</a>
+                                </td>
                             </tr>
                         @empty
                             <tr>
