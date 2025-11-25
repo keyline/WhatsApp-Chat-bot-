@@ -495,40 +495,44 @@ use App\Models\Conversation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
+
+use Illuminate\Support\Facades\Log;
+
 class BotWebhookController extends Controller
 {
     public function handle(Request $request)
-        {
-            // 👇 Use ONE fixed verify token for now
-            $myVerifyToken = 'SGTHJhgdssdnhsbdhdnHDFNBSH';   // EXACTLY same as in Meta
+    {
+        // 👇 EXACTLY the same value you type in the Meta "Verify token" box
+        $myVerifyToken = 'SGTHJhgdsdnhsbdhdnHDFNBSH';
 
-            // 1) WEBHOOK VERIFICATION (GET)
-            if ($request->isMethod('get')) {
-                // Laravel converts dots in query params to underscores:
-                // hub.mode => hub_mode, etc.
-                $mode      = $request->query('hub_mode');
-                $sentToken = $request->query('hub_verify_token');
-                $challenge = $request->query('hub_challenge');
+        // 1) META WEBHOOK VERIFICATION (GET)
+        if ($request->isMethod('get')) {
+            // Laravel converts dots in query params to underscores:
+            // hub.mode          -> hub_mode
+            // hub.verify_token  -> hub_verify_token
+            // hub.challenge     -> hub_challenge
+            $mode      = $request->query('hub_mode');
+            $sentToken = $request->query('hub_verify_token');
+            $challenge = $request->query('hub_challenge');
 
-                Log::info('Webhook VERIFY', [
-                    'mode'       => $mode,
-                    'sent_token' => $sentToken,
-                    'challenge'  => $challenge,
-                ]);
+            Log::info('WA VERIFY', [
+                'mode'       => $mode,
+                'sent_token' => $sentToken,
+                'challenge'  => $challenge,
+            ]);
 
-                if ($mode === 'subscribe' && $sentToken === $myVerifyToken) {
-                    // ✅ MUST return the challenge as plain text with 200
-                    return response($challenge, 200);
-                }
-
-                return response('Invalid verify token', 403);
+            if ($mode === 'subscribe' && $sentToken === $myVerifyToken) {
+                // ✅ MUST return the challenge as plain text with 200
+                return response($challenge, 200)
+                    ->header('Content-Type', 'text/plain');
             }
 
-            // 2) NORMAL WEBHOOK POST (messages, statuses)
-            Log::info('Webhook POST payload', $request->all());
-
-            return response()->json(['status' => 'ok']);
+            return response('Invalid verify token', 403);
         }
 
-    // keep your getReplyForMessage() and sendWhatsAppText() as you already have
+        // 2) NORMAL WEBHOOK POST (after verification succeeds)
+        Log::info('WA POST', $request->all());
+
+        return response()->json(['status' => 'ok']);
+    }
 }
