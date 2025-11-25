@@ -58,7 +58,7 @@
                     <span class="nav-icon">💬</span>
                     <span class="nav-text">Messages</span>
                 </a>
-                <a href="{{ route('bot.settings.edit') }}" class="nav-item {{ request()->routeIs('bots_flows') ? 'active' : '' }}">
+                <a href="{{ route('bot.settings.dashboard') }}" class="nav-item {{ request()->routeIs('bots_flows') ? 'active' : '' }}">
                     <span class="nav-icon">🤖</span>
                     <span class="nav-text">Bots & Flows</span>
                 </a>
