@@ -29,7 +29,7 @@ class BotController extends Controller
         $conversations = Conversation::where('user_id', $userId)
             ->orderByDesc('id')
             ->paginate(20); // pagination
-        //  dd($conversations); die;
+         dd($conversations); die;
         return view('bot_flows.bot-settings', [
             'settings'       => $settings,
             'conversations'  => $conversations,

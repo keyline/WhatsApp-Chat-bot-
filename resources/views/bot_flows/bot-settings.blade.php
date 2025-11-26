@@ -33,9 +33,6 @@
                             <th>Sl. No.</th>
                             <th>Phone</th>
                             <th>Step</th>
-                            <th>Service</th>
-                            <th>Option 1</th>
-                            <th>Option 2</th>
                             <th>Name</th>
                             <th>Business Name</th>
                             <th>Contact Number</th>
