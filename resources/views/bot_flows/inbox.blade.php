@@ -1,46 +1,136 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container-fluid">
-    <div class="row" style="height:80vh;">
-        {{-- LEFT: conversation list --}}
-        <div class="col-md-3 border-end overflow-auto">
-            <h5 class="mt-3 mb-3">Conversations</h5>
+<style>
+    /* MAIN LAYOUT */
+    .chat-container {
+        height: calc(100vh - 70px);
+        display: flex;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #fff;
+    }
 
-            <ul class="list-group" id="conversation-list">
-                @foreach($conversations as $conv)
-                    <li class="list-group-item conversation-item"
-                        data-id="{{ $conv->id }}">
-                        <div class="fw-bold">{{ $conv->phone }}</div>
-                        <small class="text-muted">
-                            {{ $conv->name ?? 'Unknown' }}
-                        </small>
-                    </li>
-                @endforeach
-            </ul>
+    /* LEFT PANEL — conversations list */
+    .chat-sidebar {
+        width: 300px;
+        border-right: 1px solid #ddd;
+        background: #f8f9fa;
+        overflow-y: auto;
+    }
+
+    .chat-sidebar .list-group-item {
+        cursor: pointer;
+        border-radius: 0 !important;
+    }
+
+    .chat-sidebar .list-group-item.active {
+        background: #0d6efd !important;
+        color: #fff;
+        border-color: #0d6efd;
+    }
+
+    /* RIGHT PANEL — chat messages */
+    .chat-window {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: #e5ddd5; /* WhatsApp-like grey */
+        position: relative;
+    }
+
+    /* CHAT HEADER */
+    .chat-header {
+        padding: 12px 18px;
+        background: #fff;
+        border-bottom: 1px solid #ddd;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    /* CHAT MESSAGES SCROLL BOX */
+    .chat-messages {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+    }
+
+    /* BUBBLES */
+    .bubble {
+        max-width: 70%;
+        padding: 10px 14px;
+        border-radius: 15px;
+        margin-bottom: 10px;
+        font-size: 14px;
+        line-height: 1.4;
+        white-space: pre-wrap;
+    }
+
+    .bubble-in {
+        background: #fff;
+        border: 1px solid #ddd;
+        align-self: flex-start;
+    }
+
+    .bubble-out {
+        background: #25D366;
+        color: white;
+        align-self: flex-end;
+    }
+
+    /* CHAT INPUT BOX */
+    .chat-input-bar {
+        padding: 10px;
+        background: #fff;
+        border-top: 1px solid #ddd;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .chat-input-bar input {
+        flex: 1;
+    }
+
+</style>
+
+<div class="chat-container shadow">
+
+    <!-- LEFT: CONTACT LIST -->
+    <div class="chat-sidebar">
+        <div class="p-3 fw-bold">Conversations</div>
+        <ul class="list-group list-group-flush" id="conversation-list">
+            @foreach($conversations as $conv)
+            <li class="list-group-item conversation-item"
+                data-id="{{ $conv->id }}">
+                <div class="fw-bold">{{ $conv->phone }}</div>
+                <small class="text-muted">{{ $conv->name ?? '-' }}</small>
+            </li>
+            @endforeach
+        </ul>
+    </div>
+
+    <!-- RIGHT: CHAT WINDOW -->
+    <div class="chat-window">
+        
+        <!-- Chat Header -->
+        <div class="chat-header" id="chat-title">
+            Select a conversation
         </div>
 
-        {{-- RIGHT: chat window --}}
-        <div class="col-md-9 d-flex flex-column">
-            <div class="border-bottom py-2 px-3">
-                <h5 id="chat-title" class="mb-0">Select a conversation</h5>
-            </div>
+        <!-- Messages -->
+        <div class="chat-messages" id="chat-messages"></div>
 
-            <div id="chat-messages"
-                 class="flex-grow-1 p-3 overflow-auto"
-                 style="background:#f5f5f5;">
-            </div>
+        <!-- Chat Input -->
+        <form id="chat-form" class="chat-input-bar">
+            @csrf
+            <input type="text" id="chat-input" class="form-control"
+                   placeholder="Type a message..." autocomplete="off">
+            <button class="btn btn-primary px-4">Send</button>
+        </form>
 
-            <form id="chat-form" class="border-top p-3 d-flex">
-                @csrf
-                <input type="text"
-                       id="chat-input"
-                       class="form-control me-2"
-                       placeholder="Type a message..."
-                       autocomplete="off">
-                <button class="btn btn-primary" type="submit">Send</button>
-            </form>
-        </div>
     </div>
 </div>
 
@@ -50,84 +140,72 @@
 
     function renderMessages(data) {
         currentConversationId = data.conversation.id;
+        const name = data.conversation.name ?? "";
+        document.getElementById("chat-title").innerText =
+            `${name} (${data.conversation.phone})`;
 
-        const title = data.conversation.name
-            ? data.conversation.name + ' (' + data.conversation.phone + ')'
-            : data.conversation.phone;
-        document.getElementById('chat-title').innerText = title;
-
-        const box = document.getElementById('chat-messages');
-        box.innerHTML = '';
+        const box = document.getElementById("chat-messages");
+        box.innerHTML = "";
 
         data.messages.forEach(msg => {
-            const wrapper = document.createElement('div');
-            wrapper.classList.add('mb-2');
-            wrapper.style.maxWidth = '70%';
+            const el = document.createElement("div");
+            el.classList.add("bubble");
 
-            const bubble = document.createElement('div');
-            bubble.classList.add('p-2', 'rounded');
-
-            if (msg.direction === 'out') {
-                wrapper.classList.add('ms-auto','text-end');
-                bubble.classList.add('bg-success','text-white','d-inline-block');
+            if (msg.direction === "out") {
+                el.classList.add("bubble-out");
             } else {
-                wrapper.classList.add('me-auto');
-                bubble.classList.add('bg-white','border','d-inline-block');
+                el.classList.add("bubble-in");
             }
 
-            bubble.innerText = msg.text;
-            wrapper.appendChild(bubble);
-            box.appendChild(wrapper);
+            el.textContent = msg.text;
+            box.appendChild(el);
         });
 
         box.scrollTop = box.scrollHeight;
     }
 
-    // click on a conversation
-    document.querySelectorAll('.conversation-item').forEach(item => {
-        item.addEventListener('click', () => {
-            const id = item.dataset.id;
+    // Click: load conversation
+    document.querySelectorAll(".conversation-item").forEach(item => {
+        item.addEventListener("click", () => {
+            document.querySelectorAll(".conversation-item")
+                .forEach(i => i.classList.remove("active"));
+            item.classList.add("active");
 
-            fetch('{{ url('/bot/inbox') }}/' + id)
+            fetch(`/bot/inbox/${item.dataset.id}`)
                 .then(res => res.json())
                 .then(renderMessages);
         });
     });
 
-    // send new message
-    document.getElementById('chat-form').addEventListener('submit', function (e) {
+    // Send message
+    document.getElementById("chat-form").addEventListener("submit", function(e) {
         e.preventDefault();
         if (!currentConversationId) return;
 
-        const input = document.getElementById('chat-input');
-        const text  = input.value.trim();
+        const input = document.getElementById("chat-input");
+        const text = input.value.trim();
         if (!text) return;
 
-        fetch('{{ url('/bot/inbox') }}/' + currentConversationId + '/send', {
-            method: 'POST',
+        fetch(`/bot/inbox/${currentConversationId}/send`, {
+            method: "POST",
             headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken,
+                "Content-Type": "application/json",
+                "X-CSRF-TOKEN": csrfToken
             },
-            body: JSON.stringify({ text }),
-        })
-        .then(res => res.json())
-        .then(() => {
-            // Immediately append message in UI
-            const box = document.getElementById('chat-messages');
-            const wrapper = document.createElement('div');
-            wrapper.classList.add('mb-2','ms-auto','text-end');
-            wrapper.style.maxWidth = '70%';
+            body: JSON.stringify({ text })
+        }).then(() => {
 
-            const bubble = document.createElement('div');
-            bubble.classList.add('bg-success','text-white','p-2','rounded','d-inline-block');
-            bubble.innerText = text;
-
-            wrapper.appendChild(bubble);
-            box.appendChild(wrapper);
+            // Append bubble instantly
+            const box = document.getElementById("chat-messages");
+            const el = document.createElement("div");
+            el.classList.add("bubble", "bubble-out");
+            el.textContent = text;
+            box.appendChild(el);
             box.scrollTop = box.scrollHeight;
-            input.value = '';
+
+            input.value = "";
         });
     });
 </script>
+
 @endsection
