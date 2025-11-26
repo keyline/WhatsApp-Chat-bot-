@@ -19,8 +19,10 @@ class RunScheduledCampaigns extends Command
         $now = now();
         $this->info('RunScheduledCampaigns called at: ' . $now);
 
-        $campaigns = Campaign::where('user_id', $userId)
-            ->orderBy('created_at', 'desc')
+        // Only run campaigns that are scheduled and due
+        $campaigns = Campaign::where('status', 'scheduled')
+            ->whereNotNull('next_run_at')
+            ->where('next_run_at', '<=', $now)
             ->get();
 
         $this->info('Found scheduled campaigns: ' . $campaigns->count());
@@ -37,32 +39,26 @@ class RunScheduledCampaigns extends Command
             try {
                 $sentCount = $this->sendCampaign($campaign);
 
-                // update stats
                 $campaign->increment('total_sent', $sentCount);
 
                 if ($campaign->schedule_type === 'daily') {
-                    // schedule next run for tomorrow, keep status scheduled
                     $next = $campaign->next_run_at
                         ? $campaign->next_run_at->copy()->addDay()
                         : now()->addDay();
 
                     $campaign->update([
-                        'status'     => 'scheduled',
-                        'next_run_at'=> $next,
+                        'status'      => 'scheduled',
+                        'next_run_at' => $next,
                     ]);
-                    $this->info("Campaign #{$campaign->id} rescheduled for daily run at {$next}");
                 } else {
-                    // now / once: complete after running
                     $campaign->update([
-                        'status'     => 'completed',
-                        'next_run_at'=> null,
+                        'status'      => 'completed',
+                        'next_run_at' => null,
                     ]);
-                    $this->info("Campaign #{$campaign->id} completed");
                 }
 
             } catch (\Throwable $e) {
                 $campaign->update(['status' => 'failed']);
-                $this->error("Failed campaign {$campaign->id}: " . $e->getMessage());
 
                 Log::error("Failed campaign {$campaign->id}", [
                     'campaign_id' => $campaign->id,
