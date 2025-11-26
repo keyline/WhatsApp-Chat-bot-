@@ -21,6 +21,7 @@
                     id="phone"
                     name="phone"
                     placeholder="+91 98765 43210"
+                     class="form-control"
                     required
                 >
                 @error('phone')
@@ -30,7 +31,7 @@
 
             <div class="auth-field">
                 <label for="template_name">Template</label>
-                <select id="template_name" name="template_name" required>
+                <select id="template_name" name="template_name" class="form-select" required>
                     <option value="">Select a template</option>
                     @foreach($meta_templates as $tpl)
                         <option value="{{ $tpl['name'] }}">
@@ -43,7 +44,7 @@
                 @enderror
             </div>
 
-            <div class="modal-footer" style="justify-content: flex-end; padding: 0;">
+            <div class="modal-footer mt-3" style="justify-content: flex-end; padding: 0;">
                 <a href="{{ route('messages.index') }}" class="btn btn-danger">Cancel</a>
                 <button type="submit" class="btn-primary">Send Message</button>
             </div>

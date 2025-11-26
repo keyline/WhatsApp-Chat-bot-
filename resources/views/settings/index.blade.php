@@ -128,7 +128,7 @@
     </section>
 
      {{-- API CREDENTIALS MODAL --}}
-    <div id="api-modal" class="modal-overlay">
+    <div id="api-modal" class="modal-overlay w-50 h-75 m-auto p-5">
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="api-modal-title">Add API Credentials</h2>

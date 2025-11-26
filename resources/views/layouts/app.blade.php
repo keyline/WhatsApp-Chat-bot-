@@ -74,13 +74,13 @@
             </nav>
 
 
-            <div class="sidebar-footer">
+            {{-- <div class="sidebar-footer">
                 <div class="sidebar-plan">
                     <span class="plan-label">Plan</span>
                     <span class="plan-name">Starter</span>
                     <button class="btn-upgrade">Upgrade</button>
                 </div>
-            </div>
+            </div> --}}
         </aside>
 
         {{-- Main content --}}
@@ -95,7 +95,7 @@
                     <div class="search-box">
                         <input type="text" placeholder="Search campaigns, contacts..." />
                     </div>
-                    <a class="btn-topbar btn-topbar-link" href="{{ route('settings') }}">+ Add New Setting</a>
+                    {{-- <a class="btn-topbar btn-topbar-link" href="{{ route('settings') }}">+ Add New Setting</a> --}}
                     <div class="topbar-user">
                         <div class="user-avatar">{{ $initial }}</div>
                         <div class="user-info">

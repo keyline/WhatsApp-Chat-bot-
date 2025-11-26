@@ -11,9 +11,16 @@
                 <h2>Contacts List</h2>
                 <div>
                     <button class="btn-ghost">Import CSV</button>                    
-                    <button class="btn-primary" type="button" id="openContactModal">
+                    <button
+                        class="btn-primary"
+                        type="button"
+                        id="openContactModal"
+                        data-bs-toggle="modal"
+                        data-bs-target="#contactModal"
+                    >
                         + Add Contact
                     </button>
+
                 </div>
             </div>
 
@@ -110,78 +117,106 @@
     </section>
 
     {{-- Add Contact Modal --}}
-    <div id="contactModal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Add Contact</h2>
-                <button type="button" class="modal-close" id="closeContactModal">
-                    &times;
-                </button>
+    <!-- Bootstrap Contact Modal -->
+    <div class="modal fade" id="contactModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h5 class="modal-title" style="color:black;">Add Contact</h5>
+                    <button type="button"
+                            class="btn-close"
+                            id="closeContactModal"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+
+                <form method="POST" action="{{ route('contacts.store') }}">
+                    @csrf
+
+                    <div class="modal-body">
+
+                        <!-- Name -->
+                        <div class="mb-3">
+                            <label for="contact_name" class="form-label">Name</label>
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="contact_name"
+                                name="name"
+                                value="{{ old('name') }}"
+                                placeholder="John Doe"
+                            >
+                        </div>
+
+                        <!-- Phone -->
+                        <div class="mb-3">
+                            <label for="contact_phone" class="form-label">Phone (WhatsApp)</label>
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="contact_phone"
+                                name="phone"
+                                value="{{ old('phone') }}"
+                                placeholder="+91 98765 43210"
+                                required
+                            >
+                        </div>
+
+                        <!-- Email -->
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email (Optional)</label>
+                            <input
+                                type="email"
+                                class="form-control"
+                                id="email"
+                                name="email"
+                                placeholder="demo@gmail.com"
+                            >
+                        </div>
+
+                        <!-- Tags -->
+                        <div class="mb-3">
+                            <label for="contact_tags" class="form-label">Tags (Optional)</label>
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="contact_tags"
+                                name="tags"
+                                placeholder="buyer, hot lead, real-estate"
+                            >
+                        </div>
+
+                        <!-- Opt-in Status -->
+                        <div class="mb-3">
+                            <label for="optin_status" class="form-label">Opt-In Status</label>
+                            <select class="form-select" id="optin_status" name="optin_status">
+                                <option value="opted_in"  {{ old('optin_status') === 'opted_in' ? 'selected' : '' }}>Opted In</option>
+                                <option value="pending"   {{ old('optin_status') === 'pending' ? 'selected' : '' }}>Pending</option>
+                                <option value="opted_out" {{ old('optin_status') === 'opted_out' ? 'selected' : '' }}>Opted Out</option>
+                            </select>
+                        </div>
+
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button"
+                                class="btn btn-secondary"
+                                id="cancelContactModal"
+                                data-bs-dismiss="modal">
+                            Cancel
+                        </button>
+
+                        <button type="submit" class="btn btn-success">
+                            Save Contact
+                        </button>
+                    </div>
+                </form>
+
             </div>
-
-            <form method="POST" action="{{ route('contacts.store')}}">
-                @csrf
-
-                <div class="modal-body">
-                    <div class="auth-field">
-                        <label for="contact_name">Name</label>
-                        <input
-                            type="text"
-                            id="contact_name"
-                            name="name"
-                            value="{{ old('name') }}"
-                            placeholder="John Doe">
-                    </div>
-
-                    <div class="auth-field">
-                        <label for="contact_phone">Phone (WhatsApp)</label>
-                        <input
-                            type="text"
-                            id="contact_phone"
-                            name="phone"
-                            value="{{ old('phone') }}"
-                            placeholder="+91 98765 43210"
-                            required>
-                    </div>
-                    <div class="auth-field">
-                        <label for="contact_phone">Email (Optional)</label>
-                        <input
-                            type="text"
-                            id="email"
-                            name="email"
-                            placeholder="demo@gmail.com">
-                    </div>
-
-                    <div class="auth-field">
-                        <label for="contact_tags">Tags (Optional)</label>
-                        <input
-                            type="text"
-                            id="contact_tags"
-                            name="tags"
-                            placeholder="buyer, hot lead, real-estate">
-                    </div>
-
-                    <div class="auth-field">
-                        <label for="optin_status">Opt-In Status</label>
-                        <select id="optin_status" name="optin_status">
-                            <option value="opted_in"  {{ old('optin_status') === 'opted_in' ? 'selected' : '' }}>Opted In</option>
-                            <option value="pending"   {{ old('optin_status') === 'pending' ? 'selected' : '' }}>Pending</option>
-                            <option value="opted_out" {{ old('optin_status') === 'opted_out' ? 'selected' : '' }}>Opted Out</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn-ghost" id="cancelContactModal">
-                        Cancel
-                    </button>
-                    <button type="submit" class="btn-primary">
-                        Save Contact
-                    </button>
-                </div>
-            </form>
         </div>
     </div>
+
 
     {{-- Modal script --}}
     <script>
@@ -209,4 +244,5 @@
             });
         });
     </script>
+
 @endsection

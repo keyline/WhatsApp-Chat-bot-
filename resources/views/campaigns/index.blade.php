@@ -8,7 +8,12 @@
     <section class="content-card">
         <div class="content-card-header">
             <h2>All Campaigns</h2>
-            <button class="btn-primary" id="openCampaignModal" type="button">
+            <button
+                class="btn-primary"
+                type="button"
+                data-bs-toggle="modal"
+                data-bs-target="#campaignModal"
+            >
                 + New Campaign
             </button>
         </div>
@@ -71,171 +76,166 @@
     </section>
 
     {{-- New Campaign Modal --}}
-    <div id="campaignModal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>New Campaign</h2>
-                <button type="button" class="modal-close" id="closeCampaignModal">
-                    &times;
-                </button>
-            </div>
+    <div class="modal fade" id="campaignModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
 
-            <form method="POST" action="{{ route('campaigns.store') }}">
-                @csrf
+                <div class="modal-header">
+                    <h2 class="modal-title" style="color: black">New Campaign</h2>
+                    <button type="button" class="btn-close" id="closeCampaignModal" data-bs-dismiss="modal"></button>
+                </div>
 
-                <div class="modal-body">
-                    <div class="auth-field">
-                        <label for="campaign_name">Campaign Name</label>
-                        <input
-                            type="text"
-                            id="campaign_name"
-                            name="name"
-                            value="{{ old('name') }}"
-                            placeholder="Diwali Offer Broadcast"
-                            required
-                        >
-                    </div>
+                <form method="POST" action="{{ route('campaigns.store') }}">
+                    @csrf
 
-                    <div class="auth-field">
-                        <label for="campaign_template_name">Template Name</label>
-                        <select id="campaign_template_name" name="template_name" required>
-                            <option value="">Select a template</option>
-                            @foreach($meta_templates as $tpl)
-                                <option value="{{ $tpl['name'] }}">
-                                    {{ $tpl['name'] }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
+                    <div class="modal-body">
 
-                    {{-- Audience type --}}
-                    <div class="auth-field">
-                        <label>Recipients</label>
-                        <div class="recipient-options" style="display:flex; gap:16px;">
-                            <label>
-                                <input
-                                    type="radio"
-                                    name="audience_type"
-                                    value="all"
-                                    {{ old('audience_type', 'all') === 'all' ? 'checked' : '' }}>
-                                All Contacts
-                            </label>
-                            <label>
-                                <input
-                                    type="radio"
-                                    name="audience_type"
-                                    value="selected"
-                                    {{ old('audience_type') === 'selected' ? 'checked' : '' }}>
-                                Selected Only
-                            </label>
+                        {{-- Campaign Name --}}
+                        <div class="mb-3">
+                            <label for="campaign_name" class="form-label">Campaign Name</label>
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="campaign_name"
+                                name="name"
+                                value="{{ old('name') }}"
+                                placeholder="Diwali Offer Broadcast"
+                                required
+                            >
                         </div>
-                    </div>
 
-                    {{-- Contacts list (only for "Selected Only") --}}
-                    <div class="auth-field" id="selectedContactsWrapper"
-                        style="{{ old('audience_type') === 'selected' ? '' : 'display:none;' }}">
-                        <label>Select Contacts</label>
+                        {{-- Template --}}
+                        <div class="mb-3">
+                            <label for="campaign_template_name" class="form-label">Template Name</label>
+                            <select class="form-select" id="campaign_template_name" name="template_name" required>
+                                <option value="">Select a template</option>
+                                @foreach($meta_templates as $tpl)
+                                    <option value="{{ $tpl['name'] }}">
+                                        {{ $tpl['name'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
 
-                        <div class="contacts-list-scroll" style="max-height:240px; overflow-y:auto; border:1px solid #1f2933; border-radius:8px; padding:8px;">
-                            @forelse($contacts as $contact)
-                                @php
-                                    $checked = in_array($contact->phone, old('selected_numbers', []));
-                                @endphp
-                                <label class="contact-choice" style="display:flex; align-items:center; gap:8px; padding:4px 2px;">
+                        {{-- Audience --}}
+                        <div class="mb-3">
+                            <label class="form-label">Recipients</label>
+                            <div class="d-flex gap-3">
+                                <div class="form-check">
                                     <input
-                                        type="checkbox"
-                                        name="selected_numbers[]"
-                                        value="{{ $contact->phone }}"
-                                        {{ $checked ? 'checked' : '' }}>
-                                    <span>
-                                        {{ $contact->name ?? '—' }}
-                                        <span style="color:#9ca3af;">({{ $contact->phone }})</span>
-                                    </span>
-                                </label>
-                            @empty
-                                <p style="color:#9ca3af; font-size:13px; padding:4px 2px;">
-                                    No contacts found. Add some contacts first.
-                                </p>
-                            @endforelse
+                                        class="form-check-input"
+                                        type="radio"
+                                        name="audience_type"
+                                        value="all"
+                                        {{ old('audience_type', 'all') === 'all' ? 'checked' : '' }}>
+                                    <label class="form-check-label">All Contacts</label>
+                                </div>
+
+                                <div class="form-check">
+                                    <input
+                                        class="form-check-input"
+                                        type="radio"
+                                        name="audience_type"
+                                        value="selected"
+                                        {{ old('audience_type') === 'selected' ? 'checked' : '' }}>
+                                    <label class="form-check-label">Selected Only</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Selected Contacts --}}
+                        <div class="mb-3" id="selectedContactsWrapper"
+                            style="{{ old('audience_type') === 'selected' ? '' : 'display:none;' }}">
+                            <label class="form-label">Select Contacts</label>
+
+                            <div class="border rounded p-2" style="max-height:240px; overflow-y:auto;">
+                                @forelse($contacts as $contact)
+                                    @php
+                                        $checked = in_array($contact->phone, old('selected_numbers', []));
+                                    @endphp
+                                    <div class="form-check mb-2">
+                                        <input
+                                            class="form-check-input"
+                                            type="checkbox"
+                                            name="selected_numbers[]"
+                                            value="{{ $contact->phone }}"
+                                            {{ $checked ? 'checked' : '' }}>
+                                        <label class="form-check-label">
+                                            {{ $contact->name ?? '—' }}
+                                            <span class="text-muted">({{ $contact->phone }})</span>
+                                        </label>
+                                    </div>
+                                @empty
+                                    <p class="text-muted small">No contacts found. Add some contacts first.</p>
+                                @endforelse
+                            </div>
+                        </div>
+
+                        {{-- Type --}}
+                        <div class="mb-3">
+                            <label for="campaign_type" class="form-label">Type</label>
+                            <select class="form-select" id="campaign_type" name="type" required>
+                                <option value="broadcast"  {{ old('type') === 'broadcast' ? 'selected' : '' }}>Broadcast</option>
+                                <option value="automation" {{ old('type') === 'automation' ? 'selected' : '' }}>Automation</option>
+                                <option value="bot"        {{ old('type') === 'bot' ? 'selected' : '' }}>Bot</option>
+                            </select>
+                        </div>
+
+                        {{-- DateTime --}}
+                        <div class="mb-3">
+                            <label for="campaign_scheduled_at" class="form-label">
+                                Scheduled At (optional)
+                            </label>
+                            <input
+                                type="datetime-local"
+                                class="form-control"
+                                id="campaign_scheduled_at"
+                                name="scheduled_at"
+                                value="{{ old('scheduled_at') }}"
+                            >
                         </div>
                     </div>
 
+                    <div class="modal-footer">
+                        <button type="button"
+                                id="cancelCampaignModal"
+                                class="btn btn-secondary"
+                                data-bs-dismiss="modal">
+                            Cancel
+                        </button>
 
-                    <div class="auth-field">
-                        <label for="campaign_type">Type</label>
-                        <select id="campaign_type" name="type" required>
-                            <option value="broadcast"  {{ old('type') === 'broadcast' ? 'selected' : '' }}>Broadcast</option>
-                            <option value="automation" {{ old('type') === 'automation' ? 'selected' : '' }}>Automation</option>
-                            <option value="bot"        {{ old('type') === 'bot' ? 'selected' : '' }}>Bot</option>
-                        </select>
+                        <button type="submit" class="btn btn-success">
+                            Create Campaign
+                        </button>
                     </div>
+                </form>
 
-                    <div class="auth-field">
-                        <label for="campaign_scheduled_at">Scheduled At (optional)</label>
-                        <input
-                            type="datetime-local"
-                            id="campaign_scheduled_at"
-                            name="scheduled_at"
-                            value="{{ old('scheduled_at') }}"
-                        >
-                    </div>
-                </div>
-
-                <div class="modal-footer">
-                    <button type="button" class="btn-ghost" id="cancelCampaignModal">
-                        Cancel
-                    </button>
-                    <button type="submit" class="btn-primary">
-                        Create Campaign
-                    </button>
-                </div>
-            </form>
+            </div>
         </div>
     </div>
 
+
     {{-- Modal JS --}}
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const openBtn   = document.getElementById('openCampaignModal');
-            const modal     = document.getElementById('campaignModal');
-            const closeBtn  = document.getElementById('closeCampaignModal');
-            const cancelBtn = document.getElementById('cancelCampaignModal');
+    document.addEventListener('DOMContentLoaded', function () {
+        const audienceRadios   = document.querySelectorAll('input[name="audience_type"]');
+        const selectedWrapper  = document.getElementById('selectedContactsWrapper');
 
-            if (!openBtn || !modal) return;
+        if (audienceRadios.length && selectedWrapper) {
+            const updateVisibility = () => {
+                const value = document.querySelector('input[name="audience_type"]:checked')?.value;
+                if (value === 'selected') {
+                    selectedWrapper.style.display = '';
+                } else {
+                    selectedWrapper.style.display = 'none';
+                }
+            };
 
-            const openModal  = () => modal.classList.add('is-open');
-            const closeModal = () => modal.classList.remove('is-open');
-
-            openBtn.addEventListener('click', openModal);
-            closeBtn.addEventListener('click', closeModal);
-            cancelBtn.addEventListener('click', closeModal);
-
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) closeModal();
-            });
-
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') closeModal();
-            });
-
-            const audienceRadios = document.querySelectorAll('input[name="audience_type"]');
-            const selectedWrapper = document.getElementById('selectedContactsWrapper');
-
-            if (audienceRadios.length && selectedWrapper) {
-                const updateVisibility = () => {
-                    const value = document.querySelector('input[name="audience_type"]:checked')?.value;
-                    if (value === 'selected') {
-                        selectedWrapper.style.display = '';
-                    } else {
-                        selectedWrapper.style.display = 'none';
-                    }
-                };
-
-                audienceRadios.forEach(r => r.addEventListener('change', updateVisibility));
-                updateVisibility();
-            }
-
-        });
+            audienceRadios.forEach(r => r.addEventListener('change', updateVisibility));
+            updateVisibility();
+        }
+    });
     </script>
+
 
 @endsection
