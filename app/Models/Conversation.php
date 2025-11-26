@@ -10,12 +10,10 @@ class Conversation extends Model
         'user_id',
         'phone',
         'step',
-        'service',
-        'option1',
-        'option2',
-        'name',
-        'business_name',
-        'contact_number',
-        'email',
+        'data',
+    ];
+
+    protected $casts = [
+        'data' => 'array',
     ];
 }
