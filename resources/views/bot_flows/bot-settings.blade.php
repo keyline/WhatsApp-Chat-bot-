@@ -33,6 +33,7 @@
                             <th>Sl. No.</th>
                             <th>Phone</th>
                             <th>Step</th>
+                            <th>Requirement</th>
                             <th>Name</th>
                             <th>Business Name</th>
                             <th>Contact Number</th>
