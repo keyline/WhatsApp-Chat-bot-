@@ -43,11 +43,18 @@ Route::middleware('auth')->group(function () {
     Route::get('/bot-settings', [BotController::class, 'dashboard'])->name('bot.settings.dashboard');
     Route::post('/bot/send-message', [BotController::class, 'sendManualMessage'])
     ->name('bot.sendMessage');
+      // full inbox page
+    Route::get('/bot/inbox', [ChatInboxController::class, 'index'])
+        ->name('bot.inbox');
+
+    // fetch history for one conversation (AJAX)
+    Route::get('/bot/inbox/{conversation}', [ChatInboxController::class, 'history'])
+        ->name('bot.inbox.history');
+
+    // send manual message (AJAX)
+    Route::post('/bot/inbox/{conversation}/send', [ChatInboxController::class, 'send'])
+        ->name('bot.inbox.send');
 });
 
 // Default home redirect
 Route::get('/', fn () => redirect()->route('dashboard'));
-
-// Route::match(['get', 'post'], '/webhook/bot/{token}', [BotWebhookController::class, 'handle'])
-//     ->withoutMiddleware([VerifyCsrfToken::class])   // ⬅ disable CSRF just for this route
-//     ->name('bot.webhook');
