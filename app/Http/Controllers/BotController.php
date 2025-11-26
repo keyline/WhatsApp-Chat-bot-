@@ -12,29 +12,25 @@ use Illuminate\Support\Facades\Http;
 
 class BotController extends Controller
 {
-     public function dashboard()
-   {
-        $userId = auth()->id(); // or however you store current user
+    public function dashboard()
+    {
+        $userId = auth()->id();
 
-        // Bot / webhook settings for this user
         $settings = Setting::firstOrCreate(
             ['user_id' => $userId],
             ['verify_token' => Str::random(32)]
         );
 
-        // Your webhook URL (from earlier)
-        // $webhookUrl = route('bot.webhook', ['token' => $settings->bot_token]);
-
-        // All conversations for this user
         $conversations = Conversation::where('user_id', $userId)
             ->orderByDesc('id')
-            ->paginate(20); // pagination
-         dd($conversations); die;
+            ->paginate(20);
+
         return view('bot_flows.bot-settings', [
-            'settings'       => $settings,
-            'conversations'  => $conversations,
+            'settings'      => $settings,
+            'conversations' => $conversations,
         ]);
-   }
+    }
+
 
 
    public function sendManualMessage(Request $request)

@@ -42,40 +42,41 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @php $i = 1; @endphp
-                        @forelse($conversations as $conv)
-                            <tr>
-                                <td><?php echo $i; $i++; ?></td>
-                                <td>{{ $conv->phone }}</td>
-                                <td>{{ $conv->step }}</td>
-                                <td>{{ $conv->service }}</td>
-                                <td>{{ $conv->option1 }}</td>
-                                <td>{{ $conv->option2 }}</td>
-                                <td>{{ $conv->name }}</td>
-                                <td>{{ $conv->business_name }}</td>
-                                <td>{{ $conv->contact_number }}</td>
-                                <td>{{ $conv->email }}</td>
-                                <td>{{ $conv->created_at }}</td>
-                                <td>
-                                    <button
-                                        type="button"
-                                        class="btn btn-primary btn-sm btn-message"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#sendMessageModal"
-                                        data-phone="{{ $conv->phone }}"
-                                    >
-                                        Message
-                                    </button>
-                                </td>
+                    @php $i = 1; @endphp
+                    @forelse($conversations as $conv)
+                        <tr>
+                            <td>{{ $i++ }}</td>
+                            <td>{{ $conv->phone }}</td>
+                            <td>{{ $conv->step }}</td>
 
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="11" class="text-center p-3">
-                                    No conversations yet.
-                                </td>
-                            </tr>
-                        @endforelse
+                            {{-- Requirement from service -> primary goal --}}
+                            <td>{{ $conv->requirement }}</td>
+
+                            <td>{{ $conv->name ?? '-' }}</td>
+                            <td>{{ $conv->business_name ?? '-' }}</td>
+                            <td>{{ $conv->contact_number ?? '-' }}</td>
+                            <td>{{ $conv->email ?? '-' }}</td>
+                            <td>{{ $conv->created_at }}</td>
+
+                            <td>
+                                <button
+                                    type="button"
+                                    class="btn btn-primary btn-sm btn-message"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#sendMessageModal"
+                                    data-phone="{{ $conv->phone }}"
+                                >
+                                    Message
+                                </button>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="11" class="text-center p-3">
+                                No conversations yet.
+                            </td>
+                        </tr>
+                    @endforelse
                     </tbody>
                 </table>
             </div>
