@@ -59,3 +59,9 @@ Route::middleware('auth')->group(function () {
 
 // Default home redirect
 Route::get('/', fn () => redirect()->route('dashboard'));
+
+// For Campaign cron
+Route::get('/cron/run-campaigns', function () {
+    Artisan::call('campaigns:run');
+    return 'OK';
+});

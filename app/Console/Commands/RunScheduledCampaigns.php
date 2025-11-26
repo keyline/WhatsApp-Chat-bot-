@@ -19,9 +19,8 @@ class RunScheduledCampaigns extends Command
         $now = now();
         $this->info('RunScheduledCampaigns called at: ' . $now);
 
-        $campaigns = Campaign::where('status', 'scheduled')
-            ->whereNotNull('scheduled_at')
-            ->where('scheduled_at', '<=', $now)
+        $campaigns = Campaign::where('user_id', $userId)
+            ->orderBy('created_at', 'desc')
             ->get();
 
         $this->info('Found scheduled campaigns: ' . $campaigns->count());
@@ -36,9 +35,31 @@ class RunScheduledCampaigns extends Command
             $campaign->update(['status' => 'running']);
 
             try {
-                $this->sendCampaign($campaign);
-                $campaign->update(['status' => 'completed']);
-                $this->info("Campaign #{$campaign->id} completed");
+                $sentCount = $this->sendCampaign($campaign);
+
+                // update stats
+                $campaign->increment('total_sent', $sentCount);
+
+                if ($campaign->schedule_type === 'daily') {
+                    // schedule next run for tomorrow, keep status scheduled
+                    $next = $campaign->next_run_at
+                        ? $campaign->next_run_at->copy()->addDay()
+                        : now()->addDay();
+
+                    $campaign->update([
+                        'status'     => 'scheduled',
+                        'next_run_at'=> $next,
+                    ]);
+                    $this->info("Campaign #{$campaign->id} rescheduled for daily run at {$next}");
+                } else {
+                    // now / once: complete after running
+                    $campaign->update([
+                        'status'     => 'completed',
+                        'next_run_at'=> null,
+                    ]);
+                    $this->info("Campaign #{$campaign->id} completed");
+                }
+
             } catch (\Throwable $e) {
                 $campaign->update(['status' => 'failed']);
                 $this->error("Failed campaign {$campaign->id}: " . $e->getMessage());
@@ -53,62 +74,34 @@ class RunScheduledCampaigns extends Command
         return Command::SUCCESS;
     }
 
-    protected function sendCampaign(Campaign $campaign)
+    protected function sendCampaign(Campaign $campaign): int
     {
-        // 1) Build numbers list
-        if ($campaign->whatsapp_numbers === 'ALL') {
-            $contacts = Contact::where('user_id', $campaign->user_id)->get();
-            $numbers = $contacts->pluck('phone')->filter()->unique()->values()->all();
-        } else {
-            $numbers = collect(explode(',', $campaign->whatsapp_numbers))
-                ->map(fn ($n) => trim($n))
-                ->filter()
-                ->unique()
-                ->values()
-                ->all();
-        }
+        // ... (same as yours, build $numbers)
 
-        if (empty($numbers)) {
-            $this->info("Campaign #{$campaign->id} has no numbers to send to.");
-            return;
-        }
+        $sentCount = 0;
 
-        // 2) Get WhatsApp credentials for this user
-        $settings = Setting::where('user_id', $campaign->user_id)->first();
-
-        if (!$settings || !$settings->phone_number_id || !$settings->access_token) {
-            throw new \RuntimeException('WhatsApp settings missing for user ' . $campaign->user_id);
-        }
-
-        $phoneNumberId = $settings->phone_number_id;
-        $accessToken   = $settings->access_token;
-        $url = "https://graph.facebook.com/v20.0/{$phoneNumberId}/messages";
-
-        // 3) Send to each number
         foreach ($numbers as $to) {
             $this->info("Sending to {$to} for campaign #{$campaign->id}");
 
-            $response = Http::withToken($accessToken)->post($url, [
-                "messaging_product" => "whatsapp",
-                "to"   => $to,
-                "type" => "template",
-                "template" => [
-                    "name"     => $campaign->template_name,
-                    "language" => ["code" => "en"],
-                ],
-            ]);
+            $response = Http::withToken($accessToken)->post($url, [ /* ... */ ]);
 
             if (!$response->successful()) {
-                $this->error("WhatsApp API failed for {$to}: " . $response->body());
-
+                // log fail
                 Log::warning('WhatsApp API failed for campaign', [
                     'campaign_id' => $campaign->id,
                     'to'          => $to,
                     'body'        => $response->body(),
                 ]);
+
+                $campaign->increment('total_failed');
+                $this->error("WhatsApp API failed for {$to}: " . $response->body());
             } else {
+                $sentCount++;
                 $this->info("Message sent successfully to {$to}");
             }
         }
+
+        return $sentCount;
     }
+
 }

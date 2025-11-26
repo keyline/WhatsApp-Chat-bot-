@@ -53,9 +53,10 @@
                         </td>
 
                         <td>{{ $campaign->created_at->format('d M Y, H:i') }}</td>
-                        <td>{{ $campaign->scheduled_at->format('d M Y, H:i') }}</td>
+                        <td>{{ $campaign->scheduled_at ? $campaign->scheduled_at->format('d M Y, H:i') : '-' }}</td>
 
-                        <td>{{ $campaign->targets_count }}</td>
+                        {{-- Messages Sent --}}
+                        <td>{{ $campaign->total_sent }}</td>
 
                         <td>
                             <a href="#" class="link-small">View</a> ·
@@ -180,11 +181,47 @@
                                 <option value="bot"        {{ old('type') === 'bot' ? 'selected' : '' }}>Bot</option>
                             </select>
                         </div>
-
-                        {{-- DateTime --}}
+                        {{-- When to send --}}
                         <div class="mb-3">
+                            <label class="form-label">When to send?</label>
+                            <div class="d-flex gap-3">
+                                <div class="form-check">
+                                    <input class="form-check-input"
+                                        type="radio"
+                                        name="schedule_type"
+                                        value="now"
+                                        {{ old('schedule_type', 'now') === 'now' ? 'checked' : '' }}>
+                                    <label class="form-check-label" style="color:black;">Send now</label>
+                                </div>
+
+                                <div class="form-check">
+                                    <input class="form-check-input"
+                                        type="radio"
+                                        name="schedule_type"
+                                        value="once"
+                                        {{ old('schedule_type') === 'once' ? 'checked' : '' }}>
+                                    <label class="form-check-label" style="color:black;">Schedule once</label>
+                                </div>
+
+                                <div class="form-check">
+                                    <input class="form-check-input"
+                                        type="radio"
+                                        name="schedule_type"
+                                        value="daily"
+                                        {{ old('schedule_type') === 'daily' ? 'checked' : '' }}>
+                                    <label class="form-check-label" style="color:black;">Repeat daily</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- First run date/time --}}
+                        @php
+                            $showFirstRun = in_array(old('schedule_type', 'now'), ['once', 'daily']);
+                        @endphp
+
+                        <div class="mb-3" id="firstRunWrapper" style="{{ $showFirstRun ? '' : 'display:none;' }}">
                             <label for="campaign_scheduled_at" class="form-label">
-                                Scheduled At (optional)
+                                First run at (for schedule / daily)
                             </label>
                             <input
                                 type="datetime-local"
@@ -194,6 +231,7 @@
                                 value="{{ old('scheduled_at') }}"
                             >
                         </div>
+
                     </div>
 
                     <div class="modal-footer">
@@ -218,24 +256,40 @@
     {{-- Modal JS --}}
     <script>
     document.addEventListener('DOMContentLoaded', function () {
+        // ===== Recipients (existing code) =====
         const audienceRadios   = document.querySelectorAll('input[name="audience_type"]');
         const selectedWrapper  = document.getElementById('selectedContactsWrapper');
 
         if (audienceRadios.length && selectedWrapper) {
-            const updateVisibility = () => {
+            const updateAudienceVisibility = () => {
                 const value = document.querySelector('input[name="audience_type"]:checked')?.value;
-                if (value === 'selected') {
-                    selectedWrapper.style.display = '';
+                selectedWrapper.style.display = (value === 'selected') ? '' : 'none';
+            };
+
+            audienceRadios.forEach(r => r.addEventListener('change', updateAudienceVisibility));
+            updateAudienceVisibility();
+        }
+
+        // ===== Schedule type → show/hide datetime =====
+        const scheduleRadios = document.querySelectorAll('input[name="schedule_type"]');
+        const firstRunWrapper = document.getElementById('firstRunWrapper');
+
+        if (scheduleRadios.length && firstRunWrapper) {
+            const updateScheduleVisibility = () => {
+                const value = document.querySelector('input[name="schedule_type"]:checked')?.value;
+                if (value === 'now') {
+                    firstRunWrapper.style.display = 'none';
                 } else {
-                    selectedWrapper.style.display = 'none';
+                    firstRunWrapper.style.display = '';
                 }
             };
 
-            audienceRadios.forEach(r => r.addEventListener('change', updateVisibility));
-            updateVisibility();
+            scheduleRadios.forEach(r => r.addEventListener('change', updateScheduleVisibility));
+            updateScheduleVisibility(); // set on page load
         }
     });
     </script>
+
 
 
 @endsection

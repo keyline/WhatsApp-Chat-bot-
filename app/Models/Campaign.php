@@ -21,6 +21,8 @@ class Campaign extends Model
         'type',
         'status',
         'scheduled_at',
+        'total_sent',
+        'total_failed',
     ];
 
     public function template()

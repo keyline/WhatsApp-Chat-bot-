@@ -45,7 +45,7 @@ class CampaignController extends Controller
             ->where('user_id', $userId)
             ->orderBy('created_at', 'desc')
             ->get();
-
+//    dd($campaigns); die;
         $contacts = Contact::where('user_id', Auth::id())
         ->orderBy('name')
         ->get();    
@@ -53,7 +53,7 @@ class CampaignController extends Controller
         return view('campaigns.index', ['campaigns' => $campaigns, 'meta_templates' => $meta_templates, 'contacts' => $contacts]);
     }
 
-        public function store(Request $request)
+    public function store(Request $request)
     {
         $validated = $request->validate([
             'name'          => 'required|string|max:255',
@@ -62,40 +62,113 @@ class CampaignController extends Controller
             'selected_numbers'   => 'nullable|array',
             'selected_numbers.*' => 'string',
             'type'          => 'required|in:broadcast,automation,bot',
-            'scheduled_at' => 'nullable|date_format:Y-m-d\TH:i',
+            'schedule_type' => 'required|in:now,once,daily',
+            'scheduled_at'  => 'nullable|date_format:Y-m-d\TH:i',
         ]);
 
-        // Build whatsapp_numbers based on audience_type
+        // Build recipient list
         if ($validated['audience_type'] === 'all') {
-            // special marker to indicate "send to all contacts"
             $whatsappNumbers = 'ALL';
         } else {
-            // audience_type = selected
             $numbers = $validated['selected_numbers'] ?? [];
-
             if (empty($numbers)) {
-                return back()
-                    ->withInput()
-                    ->withErrors(['selected_numbers' => 'Please select at least one contact.']);
+                return back()->withErrors(['selected_numbers' => 'Please select at least one contact.']);
             }
-
-            // convert array ["+9111...", "+9222..."] → "+9111...,+9222..."
             $whatsappNumbers = implode(',', $numbers);
         }
 
-        Campaign::create([
+        $now = now();
+        $scheduleType = $validated['schedule_type'];
+
+        // set next_run_at for scheduled campaigns
+        if ($scheduleType === 'now') {
+            $nextRunAt = null; // no schedule
+        } else {
+            $nextRunAt = $validated['scheduled_at']
+                ? \Carbon\Carbon::createFromFormat('Y-m-d\TH:i', $validated['scheduled_at'])
+                : $now;
+        }
+
+        // Create campaign
+        $campaign = Campaign::create([
             'user_id'          => Auth::id(),
             'name'             => $validated['name'],
             'template_name'    => $validated['template_name'],
             'whatsapp_numbers' => $whatsappNumbers,
+            'audience_type'    => $validated['audience_type'],
             'type'             => $validated['type'],
-            'status'           => 'scheduled',   // or 'draft'
+            'status'           => ($scheduleType === 'now') ? 'running' : 'scheduled',
+            'schedule_type'    => $scheduleType,
             'scheduled_at'     => $validated['scheduled_at'] ?? null,
+            'next_run_at'      => $nextRunAt,
         ]);
+
+        // If schedule_type = now → send immediately
+        if ($scheduleType === 'now') {
+            $this->sendNow($campaign);
+        }
 
         return redirect()
             ->route('campaigns')
             ->with('success', 'Campaign created successfully.');
+    }
+
+
+    protected function sendNow(Campaign $campaign)
+    {
+        // Build numbers list
+        if ($campaign->whatsapp_numbers === 'ALL') {
+            $contacts = \App\Models\Contact::where('user_id', $campaign->user_id)->get();
+            $numbers = $contacts->pluck('phone')->filter()->unique()->values()->all();
+        } else {
+            $numbers = collect(explode(',', $campaign->whatsapp_numbers))
+                ->map(fn ($n) => trim($n))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        if (empty($numbers)) {
+            return;
+        }
+
+        // Get settings
+        $settings = \App\Models\Setting::where('user_id', $campaign->user_id)->first();
+
+        if (!$settings || !$settings->phone_number_id || !$settings->access_token) {
+            return;
+        }
+
+        $phoneNumberId = $settings->phone_number_id;
+        $accessToken   = $settings->access_token;
+
+        $url = "https://graph.facebook.com/v20.0/{$phoneNumberId}/messages";
+
+        $sentCount = 0;
+
+        foreach ($numbers as $to) {
+            $response = \Illuminate\Support\Facades\Http::withToken($accessToken)->post($url, [
+                "messaging_product" => "whatsapp",
+                "to"   => $to,
+                "type" => "template",
+                "template" => [
+                    "name"     => $campaign->template_name,
+                    "language" => ["code" => "en"],
+                ],
+            ]);
+
+            if ($response->successful()) {
+                $sentCount++;
+            }
+        }
+
+        // Update DB
+        $campaign->update([
+            'total_sent' => $sentCount,
+            'status'     => 'completed',
+            'next_run_at' => null,
+        ]);
     }
 
 }
