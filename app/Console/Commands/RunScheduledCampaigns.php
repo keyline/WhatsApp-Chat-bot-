@@ -70,7 +70,7 @@ class RunScheduledCampaigns extends Command
         return Command::SUCCESS;
     }
 
-    protected function sendCampaign(Campaign $campaign): int
+    public function sendCampaign(Campaign $campaign): int
     {
         // ... (same as yours, build $numbers)
 
