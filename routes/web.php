@@ -11,7 +11,7 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\BotWebhookController;
 use App\Http\Controllers\ChatInboxController;
-// use App\Http\Middleware\VerifyCsrfToken;
+use Illuminate\Support\Facades\Artisan;
 
 // 🔐 Guest routes (only for not-logged-in users)
 Route::middleware('guest')->group(function () {

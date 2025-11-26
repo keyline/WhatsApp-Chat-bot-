@@ -41,8 +41,7 @@ class CampaignController extends Controller
         $meta_templates = $response->json('data') ?? [];
 
         // load campaigns with messages count
-        $campaigns = Campaign::withCount('targets')
-            ->where('user_id', $userId)
+        $campaigns = Campaign::where('user_id', $userId)
             ->orderBy('created_at', 'desc')
             ->get();
 //    dd($campaigns); die;
