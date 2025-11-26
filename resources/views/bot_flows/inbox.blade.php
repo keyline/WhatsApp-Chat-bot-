@@ -35,55 +35,58 @@
         flex: 1;
         display: flex;
         flex-direction: column;
-        background: #e5ddd5; /* WhatsApp-like grey */
+        background: #e5ddd5; /* WhatsApp-like */
         position: relative;
     }
 
     /* CHAT HEADER */
     .chat-header {
-        padding: 12px 18px;
-        background: #fff;
+        padding: 10px 16px;
+        background: #ffffff;
         border-bottom: 1px solid #ddd;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 10px;
+        color: #000; /* important: override dark theme */
     }
 
     /* CHAT MESSAGES SCROLL BOX */
     .chat-messages {
         flex: 1;
-        padding: 20px;
+        padding: 16px;
         overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
     }
 
     /* BUBBLES */
     .bubble {
         max-width: 70%;
-        padding: 10px 14px;
+        padding: 8px 12px;
         border-radius: 15px;
-        margin-bottom: 10px;
         font-size: 14px;
         line-height: 1.4;
         white-space: pre-wrap;
+        word-wrap: break-word;
     }
 
+    /* incoming (user) – LEFT, white with dark text */
     .bubble-in {
-        background: #fff;
+        background: #ffffff;
         border: 1px solid #ddd;
-        align-self: flex-start;
+        color: #000;                 /* <-- fix 1: text visible */
+        align-self: flex-start;      /* left */
     }
 
+    /* outgoing (bot/you) – RIGHT, green with white text */
     .bubble-out {
         background: #25D366;
-        color: white;
-        align-self: flex-end;
+        color: #ffffff;
+        align-self: flex-end;        /* right */
     }
 
     /* CHAT INPUT BOX */
     .chat-input-bar {
         padding: 10px;
-        background: #fff;
+        background: #ffffff;
         border-top: 1px solid #ddd;
         display: flex;
         align-items: center;
@@ -93,72 +96,77 @@
     .chat-input-bar input {
         flex: 1;
     }
-
 </style>
 
 <div class="chat-container shadow">
 
-    <!-- LEFT: CONTACT LIST -->
+    {{-- LEFT: CONTACT LIST --}}
     <div class="chat-sidebar">
         <div class="p-3 fw-bold">Conversations</div>
         <ul class="list-group list-group-flush" id="conversation-list">
             @foreach($conversations as $conv)
-            <li class="list-group-item conversation-item"
-                data-id="{{ $conv->id }}"
-                data-history-url="{{ route('bot.inbox.history', $conv) }}"
-                data-send-url="{{ route('bot.inbox.send', $conv) }}">
-                <div class="fw-bold">{{ $conv->phone }}</div>
-                <small class="text-muted">{{ $conv->name ?? '-' }}</small>
-            </li>
+                <li class="list-group-item conversation-item"
+                    data-id="{{ $conv->id }}"
+                    data-history-url="{{ route('bot.inbox.history', $conv) }}"
+                    data-send-url="{{ route('bot.inbox.send', $conv) }}">
+                    <div class="fw-bold">{{ $conv->phone }}</div>
+                    <small class="text-muted">{{ $conv->name ?? '-' }}</small>
+                </li>
             @endforeach
         </ul>
     </div>
 
-    <!-- RIGHT: CHAT WINDOW -->
+    {{-- RIGHT: CHAT WINDOW --}}
     <div class="chat-window">
-        
-        <!-- Chat Header -->
-        <div class="chat-header" id="chat-title">
-            Select a conversation
+
+        {{-- HEADER: phone + small name --}}
+        <div class="chat-header">
+            <div id="chat-header-phone" class="fw-semibold">Select a conversation</div>
+            <small id="chat-header-name" class="text-muted"></small>
         </div>
 
-        <!-- Messages -->
-        <div class="chat-messages" id="chat-messages"></div>
+        {{-- MESSAGES --}}
+        <div id="chat-messages" class="chat-messages"></div>
 
-        <!-- Chat Input -->
+        {{-- INPUT --}}
         <form id="chat-form" class="chat-input-bar">
             @csrf
             <input type="text" id="chat-input" class="form-control"
                    placeholder="Type a message..." autocomplete="off">
-            <button class="btn btn-primary px-4">Send</button>
+            <button class="btn btn-success px-4" type="submit">Send</button>
         </form>
 
     </div>
 </div>
 
 <script>
-    let currentConversationId = null;
     let currentSendUrl = null;
     const csrfToken = '{{ csrf_token() }}';
 
     function renderMessages(data) {
-        currentConversationId = data.conversation.id;
+        // 2. header: phone + name
+        document.getElementById('chat-header-phone').textContent =
+            data.conversation.phone || '';
 
-        const name = data.conversation.name ?? "";
-        document.getElementById("chat-title").innerText =
-            `${name} (${data.conversation.phone})`;
+        document.getElementById('chat-header-name').textContent =
+            data.conversation.name || '';
 
-        const box = document.getElementById("chat-messages");
-        box.innerHTML = "";
+        const box = document.getElementById('chat-messages');
+        box.innerHTML = '';
 
+        // 1 & 3. show both sides properly
         data.messages.forEach(msg => {
-            const el = document.createElement("div");
-            el.classList.add("bubble");
-            if (msg.direction === "out") {
-                el.classList.add("bubble-out");
+            const el = document.createElement('div');
+            el.classList.add('bubble');
+
+            if (msg.direction === 'out') {
+                // our/bot message – RIGHT, green
+                el.classList.add('bubble-out');
             } else {
-                el.classList.add("bubble-in");
+                // user reply – LEFT, white
+                el.classList.add('bubble-in');
             }
+
             el.textContent = msg.text;
             box.appendChild(el);
         });
@@ -166,12 +174,12 @@
         box.scrollTop = box.scrollHeight;
     }
 
-    // Click: load conversation
-    document.querySelectorAll(".conversation-item").forEach(item => {
-        item.addEventListener("click", () => {
-            document.querySelectorAll(".conversation-item")
-                .forEach(i => i.classList.remove("active"));
-            item.classList.add("active");
+    // click on a conversation
+    document.querySelectorAll('.conversation-item').forEach(item => {
+        item.addEventListener('click', () => {
+            document.querySelectorAll('.conversation-item')
+                .forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
 
             const historyUrl = item.dataset.historyUrl;
             currentSendUrl   = item.dataset.sendUrl;
@@ -183,35 +191,35 @@
         });
     });
 
-    // Send message
-    document.getElementById("chat-form").addEventListener("submit", function(e) {
+    // send message
+    document.getElementById('chat-form').addEventListener('submit', function (e) {
         e.preventDefault();
         if (!currentSendUrl) return;
 
-        const input = document.getElementById("chat-input");
+        const input = document.getElementById('chat-input');
         const text  = input.value.trim();
         if (!text) return;
 
         fetch(currentSendUrl, {
-            method: "POST",
+            method: 'POST',
             headers: {
-                "Content-Type": "application/json",
-                "X-CSRF-TOKEN": csrfToken
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
             },
-            body: JSON.stringify({ text })
+            body: JSON.stringify({ text }),
         })
         .then(res => res.json())
         .then(() => {
-            const box = document.getElementById("chat-messages");
-            const el  = document.createElement("div");
-            el.classList.add("bubble", "bubble-out");
+            // append our new message on RIGHT
+            const box = document.getElementById('chat-messages');
+            const el  = document.createElement('div');
+            el.classList.add('bubble', 'bubble-out');
             el.textContent = text;
             box.appendChild(el);
             box.scrollTop = box.scrollHeight;
-            input.value = "";
+            input.value = '';
         })
         .catch(err => console.error('Send error', err));
     });
 </script>
-
 @endsection
