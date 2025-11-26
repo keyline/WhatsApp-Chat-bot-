@@ -128,7 +128,7 @@
                                         name="audience_type"
                                         value="all"
                                         {{ old('audience_type', 'all') === 'all' ? 'checked' : '' }}>
-                                    <label class="form-check-label">All Contacts</label>
+                                    <label class="form-check-label" style="color:black;">All Contacts</label>
                                 </div>
 
                                 <div class="form-check">
@@ -138,7 +138,7 @@
                                         name="audience_type"
                                         value="selected"
                                         {{ old('audience_type') === 'selected' ? 'checked' : '' }}>
-                                    <label class="form-check-label">Selected Only</label>
+                                    <label class="form-check-label" style="color:black;">Selected Only</label>
                                 </div>
                             </div>
                         </div>
