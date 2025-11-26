@@ -316,14 +316,34 @@ class BotWebhookController extends Controller
                     . "4️⃣ Build brand awareness";
             }
 
-            if ($conv->step === 'dm_goal') {
-                $data['digital_marketing']['goal'] = $text;
-                $conv->step                        = 'ask_contact_name';
-                $conv->data                        = $data;
-                $conv->save();
+            // if ($conv->step === 'dm_goal') {
+            //     $data['digital_marketing']['goal'] = $text;
+            //     $conv->step                        = 'ask_contact_name';
+            //     $conv->data                        = $data;
+            //     $conv->save();
 
-                return $this->contactIntro() . "\n\n1️⃣ Your Name:";
+            //     return $this->contactIntro() . "\n\n1️⃣ Your Name:";
+            // }
+
+            if ($conv->step === 'dm_goal') {
+                                            $goalMap = [
+                                '1' => 'More leads',
+                                '2' => 'More sales',
+                                '3' => 'Increase website traffic',
+                                '4' => 'Build brand awareness',
+                            ];
+
+                            // if user sends 1–4, convert to label; if they type text, keep as is
+                            $goal = $goalMap[$text] ?? $text;
+
+                            $data['digital_marketing']['goal'] = $goal;
+                            $conv->step = 'ask_contact_name';
+                            $conv->data = $data;
+                            $conv->save();
+
+                            return $this->contactIntro() . "\n\n1️⃣ Your Name:";
             }
+
         }
 
         // ===== BRANDING BRANCH =====
