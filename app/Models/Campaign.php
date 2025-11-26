@@ -11,6 +11,7 @@ class Campaign extends Model
 
     protected $casts = [
     'scheduled_at' => 'datetime',
+    'next_run_at' => 'datetime',
     ];
 
     protected $fillable = [
