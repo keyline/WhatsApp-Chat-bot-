@@ -10,6 +10,7 @@ use App\Http\Controllers\TemplateController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\BotWebhookController;
+use App\Http\Controllers\ChatInboxController;
 // use App\Http\Middleware\VerifyCsrfToken;
 
 // 🔐 Guest routes (only for not-logged-in users)
