@@ -61,7 +61,17 @@ Route::middleware('auth')->group(function () {
 Route::get('/', fn () => redirect()->route('dashboard'));
 
 // For Campaign cron
+// Route::get('/cron/run-campaigns', function () {
+//     Artisan::call('campaigns:run');
+//     return 'OK';
+// });
+
 Route::get('/cron/run-campaigns', function () {
-    Artisan::call('campaigns:run');
-    return 'OK';
+    try {
+        Artisan::call('campaigns:run');
+
+        return nl2br(Artisan::output());  // show actual output from command
+    } catch (\Throwable $e) {
+        return "Error: " . $e->getMessage() . "<br><br>" . $e->getTraceAsString();
+    }
 });

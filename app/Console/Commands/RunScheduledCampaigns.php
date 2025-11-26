@@ -16,15 +16,15 @@ class RunScheduledCampaigns extends Command
 
     public function handle()
     {
-        $now = now();
-        $this->info('RunScheduledCampaigns called at: ' . $now);
+        
+    $now = now();
+    $this->info('RunScheduledCampaigns called at: ' . $now);
 
-        // Only run campaigns that are scheduled and due
-        $campaigns = Campaign::where('status', 'scheduled')
-            ->whereNotNull('next_run_at')
-            ->where('next_run_at', '<=', $now)
-            ->get();
-
+    $campaigns = Campaign::where('status', 'scheduled')
+        ->whereNotNull('scheduled_at')
+        ->where('scheduled_at', '<=', $now)
+        ->get();
+        //  dd($campaigns); die;
         $this->info('Found scheduled campaigns: ' . $campaigns->count());
 
         if ($campaigns->isEmpty()) {
