@@ -104,7 +104,9 @@
         <ul class="list-group list-group-flush" id="conversation-list">
             @foreach($conversations as $conv)
             <li class="list-group-item conversation-item"
-                data-id="{{ $conv->id }}">
+                data-id="{{ $conv->id }}"
+                data-history-url="{{ route('bot.inbox.history', $conv) }}"
+                data-send-url="{{ route('bot.inbox.send', $conv) }}">
                 <div class="fw-bold">{{ $conv->phone }}</div>
                 <small class="text-muted">{{ $conv->name ?? '-' }}</small>
             </li>
@@ -136,10 +138,12 @@
 
 <script>
     let currentConversationId = null;
+    let currentSendUrl = null;
     const csrfToken = '{{ csrf_token() }}';
 
     function renderMessages(data) {
         currentConversationId = data.conversation.id;
+
         const name = data.conversation.name ?? "";
         document.getElementById("chat-title").innerText =
             `${name} (${data.conversation.phone})`;
@@ -150,13 +154,11 @@
         data.messages.forEach(msg => {
             const el = document.createElement("div");
             el.classList.add("bubble");
-
             if (msg.direction === "out") {
                 el.classList.add("bubble-out");
             } else {
                 el.classList.add("bubble-in");
             }
-
             el.textContent = msg.text;
             box.appendChild(el);
         });
@@ -171,40 +173,44 @@
                 .forEach(i => i.classList.remove("active"));
             item.classList.add("active");
 
-            fetch(`/bot/inbox/${item.dataset.id}`)
+            const historyUrl = item.dataset.historyUrl;
+            currentSendUrl   = item.dataset.sendUrl;
+
+            fetch(historyUrl)
                 .then(res => res.json())
-                .then(renderMessages);
+                .then(renderMessages)
+                .catch(err => console.error('History fetch error', err));
         });
     });
 
     // Send message
     document.getElementById("chat-form").addEventListener("submit", function(e) {
         e.preventDefault();
-        if (!currentConversationId) return;
+        if (!currentSendUrl) return;
 
         const input = document.getElementById("chat-input");
-        const text = input.value.trim();
+        const text  = input.value.trim();
         if (!text) return;
 
-        fetch(`/bot/inbox/${currentConversationId}/send`, {
+        fetch(currentSendUrl, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "X-CSRF-TOKEN": csrfToken
             },
             body: JSON.stringify({ text })
-        }).then(() => {
-
-            // Append bubble instantly
+        })
+        .then(res => res.json())
+        .then(() => {
             const box = document.getElementById("chat-messages");
-            const el = document.createElement("div");
+            const el  = document.createElement("div");
             el.classList.add("bubble", "bubble-out");
             el.textContent = text;
             box.appendChild(el);
             box.scrollTop = box.scrollHeight;
-
             input.value = "";
-        });
+        })
+        .catch(err => console.error('Send error', err));
     });
 </script>
 
