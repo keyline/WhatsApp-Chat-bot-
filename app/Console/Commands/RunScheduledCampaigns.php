@@ -76,23 +76,42 @@ class RunScheduledCampaigns extends Command
     {
         $userId = $campaign->user_id;
 
-        // 1) Load settings
+        // 1) Load settings for this user
         $settings = Setting::where('user_id', $userId)->firstOrFail();
 
-        $accessToken = $settings->access_token;
+        $accessToken   = $settings->access_token;
         $phoneNumberId = $settings->phone_number_id;
 
         $url = "https://graph.facebook.com/v20.0/{$phoneNumberId}/messages";
 
-        // 2) Build $numbers array
-        $contacts = Contact::whereIn('id', $campaign->contact_ids ?? [])->get(); // adjust to your structure
+        // 2) Build $numbers array based on whatsapp_numbers
+        if (strtoupper(trim($campaign->whatsapp_numbers)) === 'ALL') {
+            // send to all contacts of this user
+            $numbers = Contact::where('user_id', $userId)
+                // ->where('optin_status', 'opted_in')   // enable if you want only opted_in
+                ->pluck('phone')
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+        } else {
+            // send only to given numbers (comma separated)
+            $numbers = collect(explode(',', (string) $campaign->whatsapp_numbers))
+                ->map(function ($n) {
+                    return trim($n);
+                })
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+        }
 
-        $numbers = $contacts
-            ->pluck('phone')        // column name in your contacts table
-            ->filter()              // remove null
-            ->unique()
-            ->values()
-            ->all();
+        $this->info('Total numbers to send: ' . count($numbers));
+
+        if (empty($numbers)) {
+            $this->warn("No numbers found for campaign #{$campaign->id}");
+            return 0;
+        }
 
         $sentCount = 0;
 
@@ -106,7 +125,6 @@ class RunScheduledCampaigns extends Command
                 'template'          => [
                     'name'     => $campaign->template_name,
                     'language' => ['code' => $campaign->template_language ?? 'en'],
-                    // add components if needed
                 ],
             ];
 
@@ -131,4 +149,5 @@ class RunScheduledCampaigns extends Command
 
         return $sentCount;
     }
+
 }
