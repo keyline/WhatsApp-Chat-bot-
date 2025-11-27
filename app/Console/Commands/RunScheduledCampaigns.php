@@ -8,6 +8,9 @@ use App\Models\Contact;
 use App\Models\Setting;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Arr;
+use Carbon\Carbon;
 
 class RunScheduledCampaigns extends Command
 {
@@ -38,24 +41,23 @@ class RunScheduledCampaigns extends Command
 
             try {
                 $sentCount = $this->sendCampaign($campaign);
-
                 $campaign->increment('total_sent', $sentCount);
 
-                if ($campaign->schedule_type === 'daily') {
-                    $next = $campaign->next_run_at
-                        ? $campaign->next_run_at->copy()->addDay()
-                        : now()->addDay();
+            if ($campaign->schedule_type === 'daily') {
+                $next = $campaign->next_run_at
+                    ? Carbon::parse($campaign->next_run_at)->addDay()
+                    : now()->addDay();
 
-                    $campaign->update([
-                        'status'      => 'scheduled',
-                        'next_run_at' => $next,
-                    ]);
-                } else {
-                    $campaign->update([
-                        'status'      => 'completed',
-                        'next_run_at' => null,
-                    ]);
-                }
+                $campaign->update([
+                    'status'      => 'scheduled',
+                    'next_run_at' => $next,
+                ]);
+            } else {
+                $campaign->update([
+                    'status'      => 'completed',
+                    'next_run_at' => null,
+                ]);
+            }
 
             } catch (\Throwable $e) {
                 $campaign->update(['status' => 'failed']);
@@ -72,32 +74,61 @@ class RunScheduledCampaigns extends Command
 
     public function sendCampaign(Campaign $campaign): int
     {
-        // ... (same as yours, build $numbers)
+        $userId = $campaign->user_id;
+
+        // 1) Load settings
+        $settings = Setting::where('user_id', $userId)->firstOrFail();
+
+        $accessToken = $settings->access_token;
+        $phoneNumberId = $settings->phone_number_id;
+
+        $url = "https://graph.facebook.com/v20.0/{$phoneNumberId}/messages";
+
+        // 2) Build $numbers array
+        $contacts = Contact::whereIn('id', $campaign->contact_ids ?? [])->get(); // adjust to your structure
+
+        $numbers = $contacts
+            ->pluck('phone')        // column name in your contacts table
+            ->filter()              // remove null
+            ->unique()
+            ->values()
+            ->all();
 
         $sentCount = 0;
 
         foreach ($numbers as $to) {
             $this->info("Sending to {$to} for campaign #{$campaign->id}");
 
-            $response = Http::withToken($accessToken)->post($url, [ /* ... */ ]);
+            $payload = [
+                'messaging_product' => 'whatsapp',
+                'to'                => $to,
+                'type'              => 'template',
+                'template'          => [
+                    'name'     => $campaign->template_name,
+                    'language' => ['code' => $campaign->template_language ?? 'en'],
+                    // add components if needed
+                ],
+            ];
 
-            if (!$response->successful()) {
-                // log fail
+            $response = Http::withToken($accessToken)->post($url, $payload);
+
+            if (! $response->successful()) {
                 Log::warning('WhatsApp API failed for campaign', [
                     'campaign_id' => $campaign->id,
                     'to'          => $to,
+                    'status'      => $response->status(),
                     'body'        => $response->body(),
                 ]);
 
                 $campaign->increment('total_failed');
                 $this->error("WhatsApp API failed for {$to}: " . $response->body());
-            } else {
-                $sentCount++;
-                $this->info("Message sent successfully to {$to}");
+                continue;
             }
+
+            $sentCount++;
+            $this->info("Message sent successfully to {$to}");
         }
 
         return $sentCount;
     }
-
 }
