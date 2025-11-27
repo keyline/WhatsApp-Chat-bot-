@@ -10,7 +10,13 @@
             <div class="content-card-header">
                 <h2>Contacts List</h2>
                 <div>
-                    <button class="btn-ghost">Import CSV</button>                    
+                    <button
+                        class="btn-ghost"
+                        type="button"
+                        data-bs-toggle="modal"
+                        data-bs-target="#importCsvModal">
+                        Import CSV
+                    </button>                    
                     <button
                         class="btn-primary"
                         type="button"
@@ -217,6 +223,68 @@
         </div>
     </div>
 
+    {{-- Import CSV Modal --}}
+    <div class="modal fade" id="importCsvModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h5 class="modal-title" style="color:black;">Import Contacts from CSV</h5>
+                    <button type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Close"></button>
+                </div>
+
+                <form method="POST"
+                    action="{{ route('contacts.import.excel') }}"
+                    enctype="multipart/form-data">
+                    @csrf
+
+                    <div class="modal-body">
+
+                        <p class="mb-2" style="font-size: 14px;">
+                            Upload a CSV file with columns:
+                            <strong>name, phone, email, tags, optin_status</strong>.<br>
+                            Example:
+                            <code>John,+919876543210,john@example.com,buyer,opted_in</code>
+                        </p>
+
+                        <div class="mb-3">
+                            <label for="csv_file" class="form-label">Upload CSV File</label>
+
+                            <div class="d-flex align-items-center gap-2">
+                            <input type="file" name="excel_file" accept=".xlsx,.xls,.csv">
+
+                                <a href="{{ route('contacts.sample.xls') }}"
+                                class="btn btn-outline-secondary btn-sm">
+                                    Download Sample xls
+                                </a>
+                            </div>
+
+                            <small class="text-muted">
+                                Format: <code>name, phone, email, tags, optin_status</code>  
+                                Example: <code>John,+919876543210,john@example.com,buyer,opted_in</code>
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button"
+                                class="btn btn-secondary"
+                                data-bs-dismiss="modal">
+                            Cancel
+                        </button>
+
+                        <button type="submit" class="btn btn-success">
+                            Import Contacts
+                        </button>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+    </div>
 
     {{-- Modal script --}}
     <script>

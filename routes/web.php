@@ -32,6 +32,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/campaigns', [CampaignController::class, 'store'])->name('campaigns.store');
     Route::get('/contacts', [ContactController::class, 'index'])->name('contacts');
     Route::post('/contacts/store', [ContactController::class, 'store'])->name('contacts.store');
+    // Route::post('/contacts/import-csv', [ContactController::class, 'importCsv'])
+    // ->name('contacts.import.csv');
+    Route::post('/contacts/import-excel', [ContactController::class, 'importExcel'])
+    ->name('contacts.import.excel');
+    Route::get('/contacts/sample-xls', [ContactController::class, 'downloadSampleXls'])
+    ->name('contacts.sample.xls');
     Route::get('/bots-flows', [BotController::class, 'index'])->name('bots_flows');
     Route::get('/templates', [TemplateController::class, 'index'])->name('templates');
     Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
@@ -55,16 +61,11 @@ Route::middleware('auth')->group(function () {
     // send manual message (AJAX)
     Route::post('/bot/inbox/{conversation}/send', [ChatInboxController::class, 'send'])
         ->name('bot.inbox.send');
+
 });
 
 // Default home redirect
 Route::get('/', fn () => redirect()->route('dashboard'));
-
-// For Campaign cron
-// Route::get('/cron/run-campaigns', function () {
-//     Artisan::call('campaigns:run');
-//     return 'OK';
-// });
 
 Route::get('/cron/run-campaigns', function () {
     try {

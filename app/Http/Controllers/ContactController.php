@@ -4,7 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Contact;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Http\Request;  
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Imports\ContactsImport;
+
 class ContactController extends Controller
 {
     public function index()
@@ -33,7 +37,7 @@ class ContactController extends Controller
         return view('contacts.index', compact('contacts', 'stats'));
     }
 
-        public function store(Request $request)
+    public function store(Request $request)
     {
         // Validate incoming data
         $validated = $request->validate([
@@ -65,4 +69,34 @@ class ContactController extends Controller
             ->route('contacts')
             ->with('success', 'Contact added successfully.');
     }
+
+    public function downloadSampleXls()
+    {
+        $path = resource_path('samples/contacts_template.xlsx');
+
+        if (! file_exists($path)) {
+            abort(404, 'Sample Excel file not found.');
+        }
+
+        return response()->download(
+            $path,
+            'contacts_template.xlsx',
+            ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+        );
+    }
+
+    public function importExcel(Request $request)
+    {
+        $request->validate([
+            'excel_file' => 'required|file|mimes:xlsx,xls,csv,txt',
+        ]);
+
+        Excel::import(new ContactsImport, $request->file('excel_file'));
+
+        return redirect()
+            ->route('contacts')
+            ->with('success', 'Contacts imported successfully!');
+    }
+
+
 }

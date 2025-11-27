@@ -97,7 +97,7 @@
                             </span>
                         </td>
 
-                        <td>{{ $campaign->sent_count }}</td>
+                        <td>{{ $campaign->total_sent }}</td>
                         <td>{{ $campaign->read_count }}</td>
                         <td>{{ $campaign->reply_count }}</td>
                     </tr>
