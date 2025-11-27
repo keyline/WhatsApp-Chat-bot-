@@ -85,18 +85,44 @@ class ContactController extends Controller
         );
     }
 
-    public function importExcel(Request $request)
-    {
-        $request->validate([
-            'excel_file' => 'required|file|mimes:xlsx,xls,csv,txt',
-        ]);
+    // public function importExcel(Request $request)
+    // {
+    //     $request->validate([
+    //         'excel_file' => 'required|file|mimes:xlsx,xls,csv,txt',
+    //     ]);
 
-        Excel::import(new ContactsImport, $request->file('excel_file'));
+    //     Excel::import(new ContactsImport, $request->file('excel_file'));
 
-        return redirect()
-            ->route('contacts')
-            ->with('success', 'Contacts imported successfully!');
-    }
+    //     return redirect()
+    //         ->route('contacts')
+    //         ->with('success', 'Contacts imported successfully!');
+    // }
 
+        public function importExcel(Request $request)
+        {
+            $request->validate([
+                'excel_file' => 'required|file|mimes:xlsx,xls,csv,txt',
+            ]);
+
+            $import = new ContactsImport(Auth::id());
+            Excel::import($import, $request->file('excel_file'));
+
+            // Build proper message
+            if ($import->inserted === 0 && $import->duplicates > 0) {
+                return redirect()
+                    ->route('contacts')
+                    ->with('error', "No contacts imported. All {$import->duplicates} rows were duplicates.");
+            }
+
+            if ($import->duplicates > 0) {
+                return redirect()
+                    ->route('contacts')
+                    ->with('success', "Contacts imported: {$import->inserted} new, {$import->duplicates} duplicates skipped.");
+            }
+
+            return redirect()
+                ->route('contacts')
+                ->with('success', 'Contacts imported successfully!');
+        }
 
 }

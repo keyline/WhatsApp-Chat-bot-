@@ -9,20 +9,46 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
 class ContactsImport implements ToModel, WithHeadingRow
 {
+    public $inserted = 0;
+    public $duplicates = 0;
+
+    protected $userId;
+
+    public function __construct($userId)
+    {
+        $this->userId = $userId;
+    }
+
     public function model(array $row)
     {
         // Skip empty rows
-        if (!isset($row['phone']) || empty(trim($row['phone']))) {
+        if (empty($row['phone'])) {
             return null;
         }
 
+        // Check duplicate (same user + phone)
+        $exists = Contact::where('user_id', $this->userId)
+            ->where('phone', $row['phone'])
+            ->exists();
+
+        if ($exists) {
+            $this->duplicates++;
+            return null; // skip this row
+        }
+
+        $this->inserted++;
+
         return new Contact([
-            'user_id' => Auth::id(),
-            'name' => $row['name'] ?? null,
-            'phone' => $row['phone'],
-            'email' => $row['email'] ?? null,
-            'tags' => json_encode(explode(',', $row['tags'] ?? '')),
+            'user_id'      => $this->userId,
+            'name'         => $row['name'] ?? null,
+            'phone'        => $row['phone'],
+            'email'        => $row['email'] ?? null,
+            'tags'         => isset($row['tags'])
+                                ? json_encode(array_map('trim', explode(',', $row['tags'])))
+                                : json_encode([]),
             'optin_status' => $row['optin_status'] ?? 'pending',
+            'last_message' => null,
+            'last_seen_at' => null,
         ]);
     }
 }

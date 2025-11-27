@@ -254,7 +254,7 @@
                             <label for="csv_file" class="form-label">Upload CSV File</label>
 
                             <div class="d-flex align-items-center gap-2">
-                            <input type="file" name="excel_file" accept=".xlsx,.xls,.csv">
+                            <input type="file" name="excel_file" accept=".xlsx,.xls,.csv" class="form-control">
 
                                 <a href="{{ route('contacts.sample.xls') }}"
                                 class="btn btn-outline-secondary btn-sm">
