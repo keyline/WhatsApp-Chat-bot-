@@ -5,7 +5,7 @@
 @section('page_subtitle', 'Organise your audience and manage opt-ins.')
 
 @section('content')
-    <section class="content-grid">
+    <section>
         <div class="content-card">
             <div class="content-card-header">
                 <h2>Contacts List</h2>
@@ -88,7 +88,9 @@
             </table>
         </div>
 
-        <div class="content-card">
+        {{-- Segements (When need to open this part, also must add this class to the section tag 
+        <section class="content-grid">) --}}
+        {{-- <div class="content-card">
             <div class="content-card-header">
                 <h2>Segments</h2>
                 <button class="btn-ghost">+ New Segment</button>
@@ -119,7 +121,7 @@
                     Real Estate Leads ({{ $stats['real_estate'] }})
                 </li>
             </ul>
-        </div>
+        </div> --}}
     </section>
 
     {{-- Add Contact Modal --}}

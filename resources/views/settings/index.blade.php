@@ -5,7 +5,7 @@
 @section('page_subtitle', 'Configure WhatsApp API, webhooks, team access and billing.')
 
 @section('content')
-    <section class="content-grid">
+    <section>
         {{-- WhatsApp API SETTINGS --}}
         <div class="content-card">
             <div class="content-card-header">
@@ -62,7 +62,8 @@
             >
                 Edit API Credentials
             </button>
-
+             
+            <?php if(empty($settings)){ ?>
             <button
                 type="button"
                 class="btn-ghost"
@@ -72,7 +73,7 @@
             >
             + Add API Credentials
             </button>
-
+             <?php } ?>
             <div class="divider"></div>
 
             {{-- WEBHOOK INFO --}}
@@ -98,8 +99,9 @@
             </ul>
         </div>
 
-        {{-- TEAM & BILLING --}}
-        <div class="content-card">
+        {{-- TEAM & BILLING (When need to open this part, also must add this class to the section tag 
+        <section class="content-grid">) --}}
+        {{-- <div class="content-card">
             <div class="content-card-header">
                 <h2>Team & Billing</h2>
             </div>
@@ -124,7 +126,7 @@
                 <li>Used this month: {{ number_format($usedThisMonth) }}</li>
             </ul>
             <button class="btn-primary" style="margin-top: 6px;">Upgrade Plan</button>
-        </div>
+        </div> --}}
     </section>
 
      {{-- API CREDENTIALS MODAL --}}

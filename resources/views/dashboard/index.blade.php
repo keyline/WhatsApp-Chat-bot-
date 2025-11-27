@@ -60,7 +60,7 @@
     </section>
 
     {{-- 🔥 RECENT CAMPAIGNS --}}
-    <section class="content-grid">
+    <section>
         <div class="content-card">
             <div class="content-card-header">
                 <h2>Recent Campaigns</h2>
@@ -113,8 +113,9 @@
             </table>
         </div>
 
-        {{-- SIDEBAR --}}
-        <div class="content-card">
+        {{-- Quick Actions (When need to open this part, also must add this class to the section tag 
+        <section class="content-grid">) --}}
+        {{-- <div class="content-card">
             <div class="content-card-header">
                 <h2>Quick Actions</h2>
             </div>
@@ -137,7 +138,7 @@
                 <li><span class="status-dot status-dot-green"></span> Webhook Verified</li>
                 <li><span class="status-dot status-dot-amber"></span> Daily quota: 8,000 / 10,000</li>
             </ul>
-        </div>
+        </div> --}}
     </section>
 
 @endsection

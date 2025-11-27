@@ -58,13 +58,13 @@
                     <span class="nav-icon">💬</span>
                     <span class="nav-text">Messages</span>
                 </a>
-                <a href="{{ route('bot.settings.dashboard') }}" class="nav-item {{ request()->routeIs('bots_flows') ? 'active' : '' }}">
+                {{-- <a href="{{ route('bot.settings.dashboard') }}" class="nav-item {{ request()->routeIs('bots_flows') ? 'active' : '' }}">
                     <span class="nav-icon">🤖</span>
                     <span class="nav-text">Bots & Flows</span>
-                </a>
+                </a> --}}
                 <a href="{{ route('bot.inbox') }}" class="nav-item {{ request()->routeIs('settings') ? 'active' : '' }}">
-                    <span class="nav-icon">👥</span>
-                    <span class="nav-text">Show Chat View</span>
+                    <span class="nav-icon">🤖</span>
+                    <span class="nav-text">Bots & Flows</span>
                 </a> 
                 <a href="{{ route('templates') }}" class="nav-item {{ request()->routeIs('templates') ? 'active' : '' }}">
                     <span class="nav-icon">📄</span>
