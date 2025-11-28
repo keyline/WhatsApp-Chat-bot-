@@ -66,6 +66,10 @@
                     <span class="nav-icon">🤖</span>
                     <span class="nav-text">Bots & Flows</span>
                 </a> 
+                <a href="{{ route('bot.flow.index') }}" class="nav-item {{ request()->routeIs('settings') ? 'active' : '' }}">
+                    <span class="nav-icon">📋</span>
+                    <span class="nav-text">Bot Questions</span>
+                </a>                 
                 <a href="{{ route('templates') }}" class="nav-item {{ request()->routeIs('templates') ? 'active' : '' }}">
                     <span class="nav-icon">📄</span>
                     <span class="nav-text">Templates</span>

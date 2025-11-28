@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Setting;
 use App\Models\Conversation;
+use App\Models\BotQuestion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -74,10 +75,11 @@ class BotWebhookController extends Controller
             ],
             [
                 'step' => 'start',
+                'data' => [],
             ]
         );
 
-        // 4) Decide reply based on conversation state
+        // 4) Decide reply based on conversation state (DYNAMIC)
         $reply = $this->getReplyForMessage($conversation, trim($text));
 
         // 4b) Store outgoing reply in JSON history
@@ -98,419 +100,241 @@ class BotWebhookController extends Controller
     }
 
     /**
-     * MAIN CHATBOT FLOW (everything in $conv->data JSON)
+     * MAIN CHATBOT FLOW (now dynamic from DB)
      */
-    protected function getReplyForMessage(Conversation $conv, string $text): string
+        protected function getReplyForMessage(Conversation $conv, string $text): string
+        {
+            $data = $conv->data ?? [];
+
+            // Log incoming message into history
+            $data['history'][] = [
+                'direction' => 'in',
+                'text'      => $text,
+                'step'      => $conv->step,
+                'time'      => now()->toIso8601String(),
+            ];
+            $conv->data = $data;
+            $conv->save();
+
+            // 🔹 If flow is already completed
+            if ($conv->step === 'completed') {
+                $normalized = strtolower(trim($text));
+
+                // If user says "hi" → start a new enquiry
+                if ($normalized === 'hi' || $normalized === 'hello') {
+                    $firstKey = 'ask_service';
+
+                    $question = BotQuestion::where('key', $firstKey)->first();
+
+                    if (! $question) {
+                        // fallback if DB not configured
+                        $conv->step = 'start';
+                        $conv->save();
+
+                        return "Let's start a new enquiry.\n"
+                            . "Hello! Welcome to Keyline Digitech.\n"
+                            . "Please configure bot_questions for key: ask_service.";
+                    }
+
+                    $conv->step = $firstKey;
+                    $conv->save();
+
+                    return "Let's start a new enquiry.\n" . $question->message;
+                }
+
+                // Otherwise keep them in completed
+                return "We already have your details. Thank you! If you want to start a new enquiry, just say *hi*.";
+            }
+
+            // 1) FIRST TIME: start the flow
+            if (! $conv->step || $conv->step === 'start') {
+                // First question key (you can change this)
+                $firstKey = 'ask_service';
+
+                $question = BotQuestion::where('key', $firstKey)->first();
+
+                if (! $question) {
+                    // Fallback if DB not configured
+                    $conv->step = 'start';
+                    $conv->save();
+
+                    return "Hello! Welcome to Keyline Digitech.\n"
+                        . "Please configure bot_questions for key: ask_service.";
+                }
+
+                $conv->step = $firstKey;
+                $conv->save();
+
+                return $question->message;
+            }
+
+            // 2) We are answering CURRENT question = $conv->step
+            $currentKey = $conv->step;
+
+            /** @var \App\Models\BotQuestion|null $question */
+            $question = BotQuestion::with('options')->where('key', $currentKey)->first();
+
+            if (! $question) {
+                // If something wrong in DB, reset conversation
+                $conv->step = 'start';
+                $conv->save();
+
+                return "Something went wrong in the bot configuration.\nLet's start again.\n"
+                    . "Hello! Welcome to Keyline Digitech.";
+            }
+
+            // 2a) Store raw answer if this question has store_field (e.g. contact.name)
+            if (! empty($question->store_field)) {
+                // store in JSON path like 'contact.name', 'contact.email', 'service', etc.
+                data_set($data, $question->store_field, $text);
+            }
+
+            // 3) Decide next step based on options in DB
+            [$nextKey, $data] = $this->applyOptionsAndGetNextKey($question, $data, $text);
+
+            // 3a) If conversation should finish
+            if ($nextKey === 'completed') {
+                $conv->step = 'completed';
+                $conv->data = $data;
+                $conv->save();
+
+                return $this->buildSummaryMessage($data);
+            }
+
+            // 3b) If no next key found, repeat same question
+            if (! $nextKey) {
+                $conv->data = $data;
+                $conv->save();
+
+                return $question->message ?: "Please reply with a valid option.";
+            }
+
+            // 4) Load next question from DB and reply with its message
+            $nextQuestion = BotQuestion::where('key', $nextKey)->first();
+
+            if (! $nextQuestion) {
+                // If next question missing, fail gracefully
+                $conv->step = 'start';
+                $conv->data = $data;
+                $conv->save();
+
+                return "Bot step '{$nextKey}' is not configured. Please contact the admin.";
+            }
+
+            $conv->step = $nextKey;
+            $conv->data = $data;
+            $conv->save();
+
+            return $nextQuestion->message;
+        }
+
+    /**
+     * Use bot_options table to decide next step and modify data
+     */
+    protected function applyOptionsAndGetNextKey(BotQuestion $question, array $data, string $text): array
     {
         $normalized = strtolower($text);
-        $data       = $conv->data ?? [];
+        $options    = $question->options;
 
-        // Current service from JSON
-        $service = $data['service'] ?? null;
+        $match = null;
 
-        // Log incoming message into history
-        $data['history'][] = [
-            'direction' => 'in',
-            'text'      => $text,
-            'step'      => $conv->step,
-            'time'      => now()->toIso8601String(),
-        ];
+        // 1) Try exact match on match_value (e.g. "1", "2", "yes")
+        $match = $options->first(function ($opt) use ($text, $normalized) {
+            // You can make this more flexible if needed
+            if ($opt->match_value === $text) {
+                return true;
+            }
 
-        // -------- STEP 1: GREETING / SERVICE SELECTION --------
-        if ($conv->step === 'start') {
-            $conv->step = 'ask_service';
-            $conv->data = $data;
-            $conv->save();
+            // Optional: text-based yes/no
+            if ($opt->match_value === 'yes' && in_array($normalized, ['yes', 'y'])) {
+                return true;
+            }
 
-            return "Hello! Welcome to Keyline Digitech.\n"
-                . "How can we help you grow your business today?\n"
-                . "Please tell us what service you are looking for (type the number):\n"
-                . "1️⃣ Website Development\n"
-                . "2️⃣ Mobile App Development\n"
-                . "3️⃣ Digital Marketing\n"
-                . "4️⃣ Branding & Creative Design";
+            if ($opt->match_value === 'no' && in_array($normalized, ['no', 'n'])) {
+                return true;
+            }
+
+            return false;
+        });
+
+        // 2) If no exact match, try default option (is_default = 1)
+        if (! $match) {
+            $match = $options->firstWhere('is_default', true);
         }
 
-        // -------- STEP 2: USER CHOOSES SERVICE --------
-        if ($conv->step === 'ask_service') {
-            if (in_array($text, ['1', '1️⃣'])) {
-                $data['service'] = 'website';
-                $conv->step      = 'web_type';
-                $conv->data      = $data;
-                $conv->save();
+        $nextKey = null;
 
-                return "Great! You’ve selected Website Development.\n"
-                    . "May I know what type of website you need?\n"
-                    . "Please choose one:\n"
-                    . "1️⃣ Business Website\n"
-                    . "2️⃣ Ecommerce Website\n"
-                    . "3️⃣ Portfolio / Personal Website\n"
-                    . "4️⃣ Custom Web Application";
+        if ($match) {
+            $nextKey = $match->next_key ?: null;
+
+            // If this option sets service (website, mobile_app, etc.)
+            if (! empty($match->set_service)) {
+                $data['service'] = $match->set_service;
             }
 
-            if (in_array($text, ['2', '2️⃣'])) {
-                $data['service'] = 'mobile_app';
-                $conv->step      = 'app_platform';
-                $conv->data      = $data;
-                $conv->save();
-
-                return "Awesome! You’ve selected Mobile App Development.\n"
-                    . "Which platform do you want to build your app on?\n"
-                    . "1️⃣ Android\n"
-                    . "2️⃣ iOS\n"
-                    . "3️⃣ Both Android & iOS";
-            }
-
-            if (in_array($text, ['3', '3️⃣'])) {
-                $data['service'] = 'digital_marketing';
-                $conv->step      = 'dm_service';
-                $conv->data      = $data;
-                $conv->save();
-
-                return "Great choice! You’ve selected Digital Marketing.\n"
-                    . "Which service are you looking for?\n"
-                    . "1️⃣ SEO\n"
-                    . "2️⃣ Google Ads\n"
-                    . "3️⃣ Social Media Marketing\n"
-                    . "4️⃣ Performance Marketing (Leads/Sales)\n"
-                    . "5️⃣ Influencer Marketing";
-            }
-
-            if (in_array($text, ['4', '4️⃣'])) {
-                $data['service'] = 'branding';
-                $conv->step      = 'brand_service';
-                $conv->data      = $data;
-                $conv->save();
-
-                return "Great! You’re interested in Branding & Creative Design.\n"
-                    . "What type of creative service do you need?\n"
-                    . "1️⃣ Logo Design\n"
-                    . "2️⃣ Branding Package (Logo + Identity + Guidelines)\n"
-                    . "3️⃣ Social Media Creatives\n"
-                    . "4️⃣ Advertising Creatives / Campaign Design";
-            }
-
-            $conv->data = $data;
-            $conv->save();
-
-            return "Please reply with:\n1 for Website Development\n2 for Mobile App Development\n3 for Digital Marketing\n4 for Branding & Creative Design.";
-        }
-
-        // Recalculate service in case it was just set
-        $service = $data['service'] ?? null;
-
-        // ===== WEBSITE BRANCH =====
-        if ($service === 'website') {
-            if ($conv->step === 'web_type') {
-                $map = [
-                    '1' => 'Business Website',
-                    '2' => 'Ecommerce Website',
-                    '3' => 'Portfolio / Personal Website',
-                    '4' => 'Custom Web Application',
-                ];
-
-                if (! isset($map[$text])) {
-                    $conv->data = $data;
-                    $conv->save();
-
-                    return "Please choose a valid option:\n"
-                        . "1 Business Website\n"
-                        . "2 Ecommerce Website\n"
-                        . "3 Portfolio / Personal Website\n"
-                        . "4 Custom Web Application";
-                }
-
-                $data['website']['type'] = $map[$text];
-                $conv->step              = 'web_existing';
-                $conv->data              = $data;
-                $conv->save();
-
-                return "Do you already have a website, or is this a new project?\n"
-                    . "1️⃣ New Website\n"
-                    . "2️⃣ Redesign Existing Website";
-            }
-
-            if ($conv->step === 'web_existing') {
-                if (str_contains($normalized, 'new') || $text === '1') {
-                    $data['website']['project_type'] = 'New Website';
-                } elseif (str_contains($normalized, 'redesign') || $text === '2') {
-                    $data['website']['project_type'] = 'Redesign Existing Website';
-                } else {
-                    $conv->data = $data;
-                    $conv->save();
-
-                    return "Please reply with:\n- New Website (or 1)\n- Redesign Existing Website (or 2)";
-                }
-
-                $conv->step = 'ask_contact_name';
-                $conv->data = $data;
-                $conv->save();
-
-                return $this->contactIntro() . "\n\n1️⃣ Your Name:";
+            // If this option stores a fixed value in JSON
+            if (! empty($match->store_field) && ! empty($match->store_value)) {
+                data_set($data, $match->store_field, $match->store_value);
             }
         }
 
-        // ===== MOBILE APP BRANCH =====
-        if ($service === 'mobile_app') {
-            if ($conv->step === 'app_platform') {
-                $map = [
-                    '1' => 'Android',
-                    '2' => 'iOS',
-                    '3' => 'Both Android & iOS',
-                ];
-
-                if (! isset($map[$text])) {
-                    $conv->data = $data;
-                    $conv->save();
-
-                    return "Please choose:\n1 Android\n2 iOS\n3 Both Android & iOS";
-                }
-
-                $data['mobile_app']['platform'] = $map[$text];
-                $conv->step                     = 'app_purpose';
-                $conv->data                     = $data;
-                $conv->save();
-
-                return "What is the main purpose of the app?\n"
-                    . "For example: booking, ecommerce, service app, delivery, education, etc.";
-            }
-
-            if ($conv->step === 'app_purpose') {
-                $data['mobile_app']['purpose'] = $text; // free text
-                $conv->step                    = 'ask_contact_name';
-                $conv->data                    = $data;
-                $conv->save();
-
-                return $this->contactIntro() . "\n\n1️⃣ Your Name:";
-            }
-        }
-
-        // ===== DIGITAL MARKETING BRANCH =====
-        if ($service === 'digital_marketing') {
-            if ($conv->step === 'dm_service') {
-                $map = [
-                    '1' => 'SEO',
-                    '2' => 'Google Ads',
-                    '3' => 'Social Media Marketing',
-                    '4' => 'Performance Marketing (Leads/Sales)',
-                    '5' => 'Influencer Marketing',
-                ];
-
-                if (! isset($map[$text])) {
-                    $conv->data = $data;
-                    $conv->save();
-
-                    return "Please choose one service:\n"
-                        . "1 SEO\n2 Google Ads\n3 Social Media Marketing\n4 Performance Marketing\n5 Influencer Marketing";
-                }
-
-                $data['digital_marketing']['service'] = $map[$text];
-                $conv->step                           = 'dm_goal';
-                $conv->data                           = $data;
-                $conv->save();
-
-                return "What is your primary goal?\n"
-                    . "1️⃣ More leads\n"
-                    . "2️⃣ More sales\n"
-                    . "3️⃣ Increase website traffic\n"
-                    . "4️⃣ Build brand awareness";
-            }
-
-            // if ($conv->step === 'dm_goal') {
-            //     $data['digital_marketing']['goal'] = $text;
-            //     $conv->step                        = 'ask_contact_name';
-            //     $conv->data                        = $data;
-            //     $conv->save();
-
-            //     return $this->contactIntro() . "\n\n1️⃣ Your Name:";
-            // }
-
-            if ($conv->step === 'dm_goal') {
-                                            $goalMap = [
-                                '1' => 'More leads',
-                                '2' => 'More sales',
-                                '3' => 'Increase website traffic',
-                                '4' => 'Build brand awareness',
-                            ];
-
-                            // if user sends 1–4, convert to label; if they type text, keep as is
-                            $goal = $goalMap[$text] ?? $text;
-
-                            $data['digital_marketing']['goal'] = $goal;
-                            $conv->step = 'ask_contact_name';
-                            $conv->data = $data;
-                            $conv->save();
-
-                            return $this->contactIntro() . "\n\n1️⃣ Your Name:";
-            }
-
-        }
-
-        // ===== BRANDING BRANCH =====
-        if ($service === 'branding') {
-            if ($conv->step === 'brand_service') {
-                $map = [
-                    '1' => 'Logo Design',
-                    '2' => 'Branding Package (Logo + Identity + Guidelines)',
-                    '3' => 'Social Media Creatives',
-                    '4' => 'Advertising Creatives / Campaign Design',
-                ];
-
-                if (! isset($map[$text])) {
-                    $conv->data = $data;
-                    $conv->save();
-
-                    return "Please choose:\n"
-                        . "1 Logo Design\n"
-                        . "2 Branding Package\n"
-                        . "3 Social Media Creatives\n"
-                        . "4 Advertising Creatives / Campaign Design";
-                }
-
-                $data['branding']['service'] = $map[$text];
-                $conv->step                  = 'brand_reference';
-                $conv->data                  = $data;
-                $conv->save();
-
-                return "Do you have any reference style or brand guideline you want us to follow?\n"
-                    . "1️⃣ Yes\n"
-                    . "2️⃣ No";
-            }
-
-            if ($conv->step === 'brand_reference') {
-                if (str_contains($normalized, 'yes') || $text === '1') {
-                    $data['branding']['reference'] = 'Has reference';
-                } elseif (str_contains($normalized, 'no') || $text === '2') {
-                    $data['branding']['reference'] = 'No reference';
-                } else {
-                    $conv->data = $data;
-                    $conv->save();
-
-                    return "Please reply Yes or No (or 1 / 2).";
-                }
-
-                $conv->step = 'ask_contact_name';
-                $conv->data = $data;
-                $conv->save();
-
-                return $this->contactIntro() . "\n\n1️⃣ Your Name:";
-            }
-        }
-
-        // ===== COMMON CONTACT INFO STEPS =====
-        if ($conv->step === 'ask_contact_name') {
-            $data['contact']['name'] = $text;
-            $conv->step              = 'ask_business_name';
-            $conv->data              = $data;
-            $conv->save();
-
-            return "2️⃣ Business Name:";
-        }
-
-        if ($conv->step === 'ask_business_name') {
-            $data['contact']['business_name'] = $text;
-            $conv->step                       = 'ask_contact_number';
-            $conv->data                       = $data;
-            $conv->save();
-
-            return "3️⃣ Contact Number:";
-        }
-
-        if ($conv->step === 'ask_contact_number') {
-            $data['contact']['phone'] = $text;
-            $conv->step               = 'ask_email';
-            $conv->data               = $data;
-            $conv->save();
-
-            return "4️⃣ Email ID:";
-        }
-
-        if ($conv->step === 'ask_email') {
-            if (! filter_var($text, FILTER_VALIDATE_EMAIL)) {
-                $conv->data = $data;
-                $conv->save();
-
-                return "Please send a valid email ID.";
-            }
-
-            $data['contact']['email'] = $text;
-            $conv->step               = 'completed';
-            $conv->data               = $data;
-            $conv->save();
-
-            // Build summary from JSON
-            $service = $data['service'] ?? '-';
-
-            $websiteType   = $data['website']['type']           ?? null;
-            $websiteProj   = $data['website']['project_type']   ?? null;
-            $appPlatform   = $data['mobile_app']['platform']    ?? null;
-            $appPurpose    = $data['mobile_app']['purpose']     ?? null;
-            $dmService     = $data['digital_marketing']['service'] ?? null;
-            $dmGoal        = $data['digital_marketing']['goal']    ?? null;
-            $brandService  = $data['branding']['service']       ?? null;
-            $brandRef      = $data['branding']['reference']     ?? null;
-
-            $name          = $data['contact']['name']           ?? '-';
-            $bizName       = $data['contact']['business_name']  ?? '-';
-            $phone         = $data['contact']['phone']          ?? '-';
-            $email         = $data['contact']['email']          ?? '-';
-
-            $detailsLines = [];
-
-            if ($websiteType || $websiteProj) {
-                $detailsLines[] = "Website type: " . ($websiteType ?: '-');
-                $detailsLines[] = "Project type: " . ($websiteProj ?: '-');
-            }
-
-            if ($appPlatform || $appPurpose) {
-                $detailsLines[] = "App platform: " . ($appPlatform ?: '-');
-                $detailsLines[] = "App purpose: " . ($appPurpose ?: '-');
-            }
-
-            if ($dmService || $dmGoal) {
-                $detailsLines[] = "Digital Marketing service: " . ($dmService ?: '-');
-                $detailsLines[] = "Goal: " . ($dmGoal ?: '-');
-            }
-
-            if ($brandService || $brandRef) {
-                $detailsLines[] = "Branding service: " . ($brandService ?: '-');
-                $detailsLines[] = "Reference: " . ($brandRef ?: '-');
-            }
-
-            $detailsText = implode("\n", $detailsLines);
-
-            return "Thank you for the details! 🙏\n"
-                . "We will connect with you shortly.\n\n"
-                . "Summary of your request:\n"
-                . "Service: {$service}\n"
-                . ($detailsText ? $detailsText . "\n" : '')
-                . "Name: {$name}\n"
-                . "Business: {$bizName}\n"
-                . "Phone: {$phone}\n"
-                . "Email: {$email}";
-        }
-
-        if ($conv->step === 'completed') {
-            $conv->data = $data;
-            $conv->save();
-
-            return "We already have your details. Thank you! If you want to start a new enquiry, just say *hi*.";
-        }
-
-        // Fallback – reset
-        $conv->step = 'start';
-        $conv->data = $data;
-        $conv->save();
-
-        return "Let's start again.\n"
-            . "Hello! Welcome to Keyline Digitech.\n"
-            . "Please reply:\n1 Website Development\n2 Mobile App Development\n3 Digital Marketing\n4 Branding & Creative Design.";
+        return [$nextKey, $data];
     }
 
-    protected function contactIntro(): string
+    /**
+     * Build final summary message (you can keep this static or later move to DB)
+     */
+    protected function buildSummaryMessage(array $data): string
     {
-        return "Thank you for the details! To assist you further, may I have your basic contact information?\n"
-            . "Please share the following one by one.";
+        $service = $data['service'] ?? '-';
+
+        $websiteType   = $data['website']['type']           ?? null;
+        $websiteProj   = $data['website']['project_type']   ?? null;
+        $appPlatform   = $data['mobile_app']['platform']    ?? null;
+        $appPurpose    = $data['mobile_app']['purpose']     ?? null;
+        $dmService     = $data['digital_marketing']['service'] ?? null;
+        $dmGoal        = $data['digital_marketing']['goal']    ?? null;
+        $brandService  = $data['branding']['service']       ?? null;
+        $brandRef      = $data['branding']['reference']     ?? null;
+
+        $name          = $data['contact']['name']           ?? '-';
+        $bizName       = $data['contact']['business_name']  ?? '-';
+        $phone         = $data['contact']['phone']          ?? '-';
+        $email         = $data['contact']['email']          ?? '-';
+
+        $detailsLines = [];
+
+        if ($websiteType || $websiteProj) {
+            $detailsLines[] = "Website type: " . ($websiteType ?: '-');
+            $detailsLines[] = "Project type: " . ($websiteProj ?: '-');
+        }
+
+        if ($appPlatform || $appPurpose) {
+            $detailsLines[] = "App platform: " . ($appPlatform ?: '-');
+            $detailsLines[] = "App purpose: " . ($appPurpose ?: '-');
+        }
+
+        if ($dmService || $dmGoal) {
+            $detailsLines[] = "Digital Marketing service: " . ($dmService ?: '-');
+            $detailsLines[] = "Goal: " . ($dmGoal ?: '-');
+        }
+
+        if ($brandService || $brandRef) {
+            $detailsLines[] = "Branding service: " . ($brandService ?: '-');
+            $detailsLines[] = "Reference: " . ($brandRef ?: '-');
+        }
+
+        $detailsText = implode("\n", $detailsLines);
+
+        return "Thank you for the details! 🙏\n"
+            . "We will connect with you shortly.\n\n"
+            . "Summary of your request:\n"
+            . "Service: {$service}\n"
+            . ($detailsText ? $detailsText . "\n" : '')
+            . "Name: {$name}\n"
+            . "Business: {$bizName}\n"
+            . "Phone: {$phone}\n"
+            . "Email: {$email}";
     }
 
     protected function sendWhatsAppText(Setting $settings, string $to, string $text): void

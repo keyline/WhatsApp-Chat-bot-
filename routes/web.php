@@ -11,6 +11,7 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\BotWebhookController;
 use App\Http\Controllers\ChatInboxController;
+use App\Http\Controllers\ChatFlowController;
 use Illuminate\Support\Facades\Artisan;
 
 // 🔐 Guest routes (only for not-logged-in users)
@@ -52,15 +53,27 @@ Route::middleware('auth')->group(function () {
     ->name('bot.sendMessage');
       // full inbox page
     Route::get('/bot/inbox', [ChatInboxController::class, 'index'])
-        ->name('bot.inbox');
+    ->name('bot.inbox');
 
     // fetch history for one conversation (AJAX)
     Route::get('/bot/inbox/{conversation}', [ChatInboxController::class, 'history'])
-        ->name('bot.inbox.history');
+    ->name('bot.inbox.history');
 
     // send manual message (AJAX)
     Route::post('/bot/inbox/{conversation}/send', [ChatInboxController::class, 'send'])
-        ->name('bot.inbox.send');
+    ->name('bot.inbox.send');
+    
+    // List all questions
+    Route::get('/bot/flow', [ChatFlowController::class, 'index'])
+    ->name('bot.flow.index');
+
+    // Show form to create a new question + options
+    Route::get('/bot/flow/create', [ChatFlowController::class, 'create'])
+    ->name('bot.flow.create');
+
+    // Handle form submit
+    Route::post('/bot/flow', [ChatFlowController::class, 'store'])
+    ->name('bot.flow.store');    
 
 });
 
