@@ -144,26 +144,26 @@ class BotWebhookController extends Controller
                 $normalized = strtolower(trim($text));
 
                 // If user says "hi" → start a new enquiry
-                if ($normalized === 'hi' || $normalized === 'hello') {
-                    $firstKey = 'ask_service';
+                // if ($normalized === 'hi' || $normalized === 'hello') {
+                //     $firstKey = 'ask_service';
 
-                    $question = BotQuestion::where('key', $firstKey)->first();
+                //     $question = BotQuestion::where('key', $firstKey)->first();
 
-                    if (! $question) {
-                        // fallback if DB not configured
-                        $conv->step = 'start';
-                        $conv->save();
+                //     if (! $question) {
+                //         // fallback if DB not configured
+                //         $conv->step = 'start';
+                //         $conv->save();
 
-                        return "Let's start a new enquiry.\n"
-                            . "Hello! Welcome to Keyline Digitech.\n"
-                            . "Please configure bot_questions for key: ask_service.";
-                    }
+                //         return "Let's start a new enquiry.\n"
+                //             . "Hello! Welcome to Keyline Digitech.\n"
+                //             . "Please configure bot_questions for key: ask_service.";
+                //     }
 
-                    $conv->step = $firstKey;
-                    $conv->save();
+                //     $conv->step = $firstKey;
+                //     $conv->save();
 
-                    return "Let's start a new enquiry.\n" . $question->message;
-                }
+                //     return "Let's start a new enquiry.\n" . $question->message;
+                // }
 
                 // Otherwise keep them in completed
                  $name = $user->name ?? 'there';
