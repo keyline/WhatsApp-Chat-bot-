@@ -108,26 +108,26 @@ class BotWebhookController extends Controller
             $data = $conv->data ?? [];
 
             // original phone from conversation
-            $phoneNumber = $conv->phone ?? '';
+            // $phoneNumber = $conv->phone ?? '';
 
             // normalize: digits only
-            $digits = preg_replace('/\D+/', '', (string) $phoneNumber);
+            // $digits = preg_replace('/\D+/', '', (string) $phoneNumber);
 
-            if ($digits === '') {
-                $user = null;
-            } else {
-                // variants to try (keep country code if present, and without leading '91')
-                $with91    = $digits;                    // e.g. 919088467525 or 9088467525 depending on input
-                $without91 = preg_replace('/^91/', '', $digits); // 9088467525
+            // if ($digits === '') {
+            //     $user = null;
+            // } else {
+            //     // variants to try (keep country code if present, and without leading '91')
+            //     $with91    = $digits;                    // e.g. 919088467525 or 9088467525 depending on input
+            //     $without91 = preg_replace('/^91/', '', $digits); // 9088467525
 
-                // search the correct column 'phone' in ConversationUser
-                $user = \App\Models\ConversationUser::where(function ($q) use ($with91, $without91) {
-                    $q->where('phone', $with91)
-                    ->orWhere('phone', $without91);
-                })->first();
-            }
+            //     // search the correct column 'phone' in ConversationUser
+            //     $user = \App\Models\ConversationUser::where(function ($q) use ($with91, $without91) {
+            //         $q->where('phone', $with91)
+            //         ->orWhere('phone', $without91);
+            //     })->first();
+            // }
 
-            $user =  ConversationUser::where('phone1', $newphoneNumber)->first();
+            // $user =  ConversationUser::where('phone1', $newphoneNumber)->first();
 
             // Log incoming message into history
             $data['history'][] = [
@@ -144,30 +144,30 @@ class BotWebhookController extends Controller
                 $normalized = strtolower(trim($text));
 
                 // If user says "hi" → start a new enquiry
-                // if ($normalized === 'hi' || $normalized === 'hello') {
-                //     $firstKey = 'ask_service';
+                if ($normalized === 'hi' || $normalized === 'hello') {
+                    $firstKey = 'ask_service';
 
-                //     $question = BotQuestion::where('key', $firstKey)->first();
+                    $question = BotQuestion::where('key', $firstKey)->first();
 
-                //     if (! $question) {
-                //         // fallback if DB not configured
-                //         $conv->step = 'start';
-                //         $conv->save();
+                    if (! $question) {
+                        // fallback if DB not configured
+                        $conv->step = 'start';
+                        $conv->save();
 
-                //         return "Let's start a new enquiry.\n"
-                //             . "Hello! Welcome to Keyline Digitech.\n"
-                //             . "Please configure bot_questions for key: ask_service.";
-                //     }
+                        return "Let's start a new enquiry.\n"
+                            . "Hello! Welcome to Keyline Digitech.\n"
+                            . "Please configure bot_questions for key: ask_service.";
+                    }
 
-                //     $conv->step = $firstKey;
-                //     $conv->save();
+                    $conv->step = $firstKey;
+                    $conv->save();
 
-                //     return "Let's start a new enquiry.\n" . $question->message;
-                // }
+                    return "Let's start a new enquiry.\n" . $question->message;
+                }
 
                 // Otherwise keep them in completed
-                 $name = $user->name ?? 'there';
-                return "Hello" . $name . ", We already have your details. Thank you! If you want to start a new enquiry, just say *hi*.";
+                //  $name = $user->name ?? 'there';
+                return "We already have your details. Thank you! If you want to start a new enquiry, just say *hi*.";
             }
 
             // 1) FIRST TIME: start the flow
