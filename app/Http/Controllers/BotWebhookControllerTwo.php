@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class BotWebhookController extends Controller
+class BotWebhookControllerTwo extends Controller
 {
     public function handle(Request $request)
     {
