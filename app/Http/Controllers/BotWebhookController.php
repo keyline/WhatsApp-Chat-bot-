@@ -77,6 +77,7 @@ class BotWebhookController extends Controller
             [
                 'step' => 'start',
                 'data' => [],
+                'phone' => $from,
             ]
         );
 
