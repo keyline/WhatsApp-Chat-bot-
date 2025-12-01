@@ -6,7 +6,8 @@
 //     ->name('bot.webhook');
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\BotWebhookController;
+// use App\Http\Controllers\BotWebhookController;
+use App\Http\Controllers\BotWebhookControllerTwo;
 
-Route::match(['get', 'post'], '/webhook/bot', [BotWebhookController::class, 'handle']);
+Route::match(['get', 'post'], '/webhook/bot', [BotWebhookControllerTwo::class, 'handle']);
 
