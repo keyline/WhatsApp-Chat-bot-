@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Setting;
 use App\Models\Conversation;
+use App\Models\ConversationUser;
 use App\Models\BotQuestion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -106,6 +107,23 @@ class BotWebhookController extends Controller
         {
             $data = $conv->data ?? [];
 
+            $phoneNumber = $conv->phone ?? '';
+
+            // 1) Normalize phone: keep digits only
+            $digits = preg_replace('/\D+/', '', (string) $phoneNumber);
+
+            // 2) Remove country code '91' if present, otherwise remove first digit (fallback)
+            if (str_starts_with($digits, '91') && strlen($digits) > 2) {
+                $newPhoneNumber = substr($digits, 2);
+            } elseif (strlen($digits) > 1) {
+                // fallback: remove the first digit
+                $newPhoneNumber = substr($digits, 1);
+            } else {
+                $newPhoneNumber = $digits; // nothing to chop
+            }
+
+            $user =  ConversationUser::where('phone1', $newphoneNumber)->first();
+
             // Log incoming message into history
             $data['history'][] = [
                 'direction' => 'in',
@@ -143,7 +161,8 @@ class BotWebhookController extends Controller
                 }
 
                 // Otherwise keep them in completed
-                return "We already have your details. Thank you! If you want to start a new enquiry, just say *hi*.";
+                 $name = $user->name ?? 'there';
+                return "Hello" . $name . ", We already have your details. Thank you! If you want to start a new enquiry, just say *hi*.";
             }
 
             // 1) FIRST TIME: start the flow
