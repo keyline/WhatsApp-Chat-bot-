@@ -162,7 +162,7 @@ class BotWebhookController extends Controller
                 // Otherwise keep them in completed
                 $user = ConversationUser::where('phone1', $newNumb)->first();
                  $name = $user->name ?? 'Sir';
-                return "Hello" . $name . ", We already have your details. Thank you! If you want to start a new enquiry, just say *hi*.";
+                return "Hello " . $name . ", We already have your details. Thank you! If you want to start a new enquiry, just say *hi*.";
             }
 
             // 1) FIRST TIME: start the flow
