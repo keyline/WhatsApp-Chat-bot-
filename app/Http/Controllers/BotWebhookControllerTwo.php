@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Setting;
 use App\Models\Conversation;
 use App\Models\ConversationUser;
-use App\Models\BotQuestion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -14,61 +13,58 @@ class BotWebhookController extends Controller
 {
     public function handle(Request $request)
     {
-        // Secret used ONLY for webhook verification
         $myVerifyToken = config('services.whatsapp.webhook_verify_token');
 
-        /**
-         * 1) META WEBHOOK VERIFICATION (GET)
-         */
+        // 1) Webhook verification (GET)
         if ($request->isMethod('get')) {
             $mode      = $request->query('hub_mode');
             $sentToken = $request->query('hub_verify_token');
             $challenge = $request->query('hub_challenge');
 
             if ($mode === 'subscribe' && $sentToken === $myVerifyToken) {
-                return response($challenge, 200)
-                    ->header('Content-Type', 'text/plain');
+                return response($challenge, 200)->header('Content-Type', 'text/plain');
             }
 
             return response('Invalid verify token', 403);
         }
 
-        /**
-         * 2) INCOMING WHATSAPP MESSAGE (POST)
-         */
+        // 2) Incoming message (POST)
         $payload = $request->all();
         Log::info('WA POST payload', $payload);
 
-        // Which phone number received this message?
         $phoneNumberId = data_get($payload, 'entry.0.changes.0.value.metadata.phone_number_id');
-
         if (! $phoneNumberId) {
             return response()->json(['status' => 'no-phone-number-id']);
         }
 
-        // Find the settings row for that phone number
         $settings = Setting::where('phone_number_id', $phoneNumberId)->first();
-
         if (! $settings) {
             Log::warning('No Setting found for phone_number_id', ['phone_number_id' => $phoneNumberId]);
             return response()->json(['status' => 'no-settings']);
         }
 
-        // Extract first message
+        // extract first message object
         $message = data_get($payload, 'entry.0.changes.0.value.messages.0');
-
         if (! $message) {
+            Log::info('No message object in payload', $payload);
             return response()->json(['status' => 'ignored']);
         }
 
         $from = $message['from'] ?? null;
-        $text = data_get($message, 'text.body', '');
-
         if (! $from) {
             return response()->json(['status' => 'no-from']);
         }
 
-        // 3) Find or create conversation for this user + phone
+        // robustly resolve incoming text (handles text, interactive button/list, contact)
+        $text = $this->resolveIncomingText($message);
+
+        Log::info('Incoming WA summary', [
+            'from' => $from,
+            'type' => $message['type'] ?? null,
+            'text' => $text,
+        ]);
+
+        // find or create conversation for this WA sender + user
         $conversation = Conversation::firstOrCreate(
             [
                 'user_id' => $settings->user_id,
@@ -81,10 +77,10 @@ class BotWebhookController extends Controller
             ]
         );
 
-        // 4) Decide reply based on conversation state (DYNAMIC)
-        $reply = $this->getReplyForMessage($conversation, trim($text));
+        // process flow
+        $reply = $this->getReplyForMessage($conversation, $text);
 
-        // 4b) Store outgoing reply in JSON history
+        // store outgoing reply in JSON history
         $data = $conversation->data ?? [];
         $data['history'][] = [
             'direction' => 'out',
@@ -95,20 +91,48 @@ class BotWebhookController extends Controller
         $conversation->data = $data;
         $conversation->save();
 
-        // 5) Send reply via WhatsApp Cloud API
+        // send via WA cloud API & log response
         $this->sendWhatsAppText($settings, $from, $reply);
 
         return response()->json(['status' => 'ok']);
     }
 
     /**
-     * MAIN CHATBOT FLOW (now dynamic from DB)
+     * Resolve interesting text from the incoming message object.
+     * Handles text, interactive (button/list), and contact share.
+     */
+    protected function resolveIncomingText(array $message): string
+    {
+        // plain text
+        $text = data_get($message, 'text.body');
+
+        // interactive (button/list)
+        if (! $text) {
+            $text = data_get($message, 'interactive.button_reply.title')
+                 ?? data_get($message, 'interactive.list_reply.title')
+                 ?? data_get($message, 'interactive.type');
+        }
+
+        // contact share (extract phone if present)
+        if (! $text && data_get($message, 'contacts.0')) {
+            $contact = data_get($message, 'contacts.0');
+            // try whatsapp id first then explicit phone
+            $text = data_get($contact, 'wa_id')
+                 ?? data_get($contact, 'phones.0.phone')
+                 ?? '';
+        }
+
+        return (string) $text;
+    }
+
+    /**
+     * Main chatbot flow for this controller (greeting -> ask phone -> match -> greet by name).
      */
     protected function getReplyForMessage(Conversation $conv, string $text): string
     {
         $data = $conv->data ?? [];
 
-        // Log incoming message into history
+        // log incoming message into history
         $data['history'][] = [
             'direction' => 'in',
             'text'      => $text,
@@ -120,24 +144,23 @@ class BotWebhookController extends Controller
 
         $normalizedText = strtolower(trim($text));
 
-        // If flow already completed, polite reply
+        // If conversation already completed, ask to start new if they say hi
         if ($conv->step === 'completed') {
-            // try to find by the raw text (user might send number to re-open)
-            $digits = preg_replace('/\D+/', '', $text);
-            $user = null;
-            if ($digits) {
-                $user = ConversationUser::where('phone1', 'like', "%{$digits}%")
-                    ->orWhere('phone2', 'like', "%{$digits}%")
-                    ->first();
+            if (preg_match('/\b(hi|hello|hey|hii|hai)\b/i', $normalizedText)) {
+                // restart flow for new enquiry
+                $conv->step = 'start';
+                $conv->save();
+                // Ask for phone again
+                return "Hi again! Please type your phone number (include country code if possible).";
             }
-            $name = $user->name ?? ($conv->data['name'] ?? 'Sir');
-            return "Hello {$name}, we already have your details. Thank you! If you want to start a new enquiry, just say *hi*.";
+
+            // If already completed and not restarting, greet by stored name if present
+            $name = $conv->data['name'] ?? 'Sir';
+            return "Hello {$name}, we already have your details. If you want to start a new enquiry, say *hi*.";
         }
 
-        // 1) If starting and user greets ==> ask for phone
-        // match common greetings
+        // If starting and user greets → ask for phone
         if (! $conv->step || $conv->step === 'start') {
-            // detect greeting words (hi, hello, hey, hai, hiii, greetings)
             if (preg_match('/\b(hi|hello|hey|hii|hai|helo|greetings)\b/i', $normalizedText)) {
                 $conv->step = 'awaiting_phone';
                 $conv->save();
@@ -146,42 +169,45 @@ class BotWebhookController extends Controller
                 $data = $conv->data ?? [];
                 $data['history'][] = [
                     'direction' => 'out',
-                    'text'      => "Hi! Please type your phone number (include country code if possible).",
+                    'text'      => "Hi! Please type your phone number (include country code if possible) or share your contact.",
                     'step'      => $conv->step,
                     'time'      => now()->toIso8601String(),
                 ];
                 $conv->data = $data;
                 $conv->save();
 
-                return "Hi! Please type your phone number (include country code if possible).";
+                return "Hi! Please type your phone number (include country code if possible) or share your contact.";
             }
 
-            // If it isn't a greeting but we're at start, ask for greeting or phone (fallback)
+            // fallback at start: ask for greeting or phone
             $conv->step = 'awaiting_phone';
             $conv->save();
             return "Welcome! Please type your phone number (or say hi).";
         }
 
-        // 2) We're waiting for phone number
+        // Awaiting phone — user should send digits or a contact share
         if ($conv->step === 'awaiting_phone') {
-            // Normalize digits only
+            // if user sent something like "yes" or other word, prompt to send number
             $digits = preg_replace('/\D+/', '', $text);
 
             if (! $digits) {
-                return "I couldn't detect a phone number. Please send the number digits only, including country code (for example: +919876543210 or 9876543210).";
+                // maybe they shared contact but our resolver didn't catch — ask to share contact explicitly
+                return "I couldn't detect a phone number. Please send your phone digits (e.g. +919876543210) or use WhatsApp's Share Contact option.";
             }
 
-            // Try multiple lookup strategies:
-            //  - exact match
-            //  - contains (handles stored numbers with or without country code)
-            $user = ConversationUser::where('phone1', $digits)
-                ->orWhere('phone2', $digits)
-                ->orWhere('phone1', 'like', "%{$digits}")
-                ->orWhere('phone2', 'like', "%{$digits}")
+            // Robust tolerant lookup: strip non-digits from DB fields and match contains
+            $user = ConversationUser::whereRaw(
+                    "REPLACE(REPLACE(REPLACE(phone1, ' ', ''), '+', ''), '-', '') LIKE ?",
+                    ["%{$digits}%"]
+                )
+                ->orWhereRaw(
+                    "REPLACE(REPLACE(REPLACE(phone2, ' ', ''), '+', ''), '-', '') LIKE ?",
+                    ["%{$digits}%"]
+                )
                 ->first();
 
             if ($user) {
-                // Save name in conversation data for future quick replies
+                // Save name for future quick replies and mark completed
                 $conv->step = 'completed';
                 $data = $conv->data ?? [];
                 $data['name'] = $user->name;
@@ -198,17 +224,17 @@ class BotWebhookController extends Controller
                 return "Hello {$user->name}, we found your record. How can we help you today?";
             }
 
-            // Not found
-            return "We couldn't find an account for that number. Please re-send your full phone number with country code (for example: +919876543210).";
+            // Not found — polite guidance
+            return "We couldn't find an account for that number. Please re-send your full phone number including country code (for example: +919876543210), or share your contact using WhatsApp.";
         }
 
-        // Default fallback
+        // default fallback
         return "Sorry, I didn't understand. Please say *hi* to start or send your phone number.";
     }
 
-      
-
-    
+    /**
+     * Send WhatsApp text via Graph API and log response.
+     */
     protected function sendWhatsAppText(Setting $settings, string $to, string $text): void
     {
         $phoneNumberId = $settings->phone_number_id;
@@ -223,7 +249,7 @@ class BotWebhookController extends Controller
 
         $url = "https://graph.facebook.com/v21.0/{$phoneNumberId}/messages";
 
-        Http::withToken($accessToken)->post($url, [
+        $response = Http::withToken($accessToken)->post($url, [
             "messaging_product" => "whatsapp",
             "to"                => $to,
             "type"              => "text",
@@ -231,6 +257,12 @@ class BotWebhookController extends Controller
                 "preview_url" => false,
                 "body"        => $text,
             ],
+        ]);
+
+        Log::info('WA send response', [
+            'to'     => $to,
+            'status' => $response->status(),
+            'body'   => $response->body(),
         ]);
     }
 }
