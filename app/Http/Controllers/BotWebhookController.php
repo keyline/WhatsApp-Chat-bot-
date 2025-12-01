@@ -77,6 +77,7 @@ class BotWebhookController extends Controller
             [
                 'step' => 'start',
                 'data' => [],
+                'phone' => $from,
             ]
         );
 
@@ -95,7 +96,7 @@ class BotWebhookController extends Controller
         $conversation->save();
 
         // 5) Send reply via WhatsApp Cloud API
-        $this->sendWhatsAppText($settings, $reply, $from);
+        $this->sendWhatsAppText($settings, $reply);
 
         return response()->json(['status' => 'ok']);
     }
@@ -103,12 +104,12 @@ class BotWebhookController extends Controller
     /**
      * MAIN CHATBOT FLOW (now dynamic from DB)
      */
-        protected function getReplyForMessage(Conversation $conv, string $text, string $convPhone): string
+        protected function getReplyForMessage(Conversation $conv, string $text): string
         {
             $data = $conv->data ?? [];
 
             // original phone from conversation
-            $phoneNumber = $convPhone ?? '';
+            $phoneNumber = $conv->phone ?? '';
             $len = strlen($phoneNumber);
 
                 if ($len == 12) {
