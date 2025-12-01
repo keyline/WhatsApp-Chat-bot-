@@ -104,50 +104,108 @@ class BotWebhookController extends Controller
     /**
      * MAIN CHATBOT FLOW (now dynamic from DB)
      */
-        protected function getReplyForMessage(Conversation $conv, string $text): string
-        {
-            $data = $conv->data ?? [];
+    protected function getReplyForMessage(Conversation $conv, string $text): string
+    {
+        $data = $conv->data ?? [];
 
-            // original phone from conversation
-            // $phoneNumber = $conv->phone ?? '';
-            // $len = strlen($phoneNumber);
+        // Log incoming message into history
+        $data['history'][] = [
+            'direction' => 'in',
+            'text'      => $text,
+            'step'      => $conv->step,
+            'time'      => now()->toIso8601String(),
+        ];
+        $conv->data = $data;
+        $conv->save();
 
-            //     if ($len == 12) {
-            //         $newNumb = substr($phoneNumber, 2);
-            //     } elseif ($len == 11) {
-            //         $newNumb = substr($phoneNumber, 1);
-            //     } elseif ($len == 13) {
-            //         $newNumb = substr($phoneNumber, 3);
-            //     } else {
-            //         $newNumb = $phoneNumber; // unchanged
-            //     }
-               
+        $normalizedText = strtolower(trim($text));
 
-            // Log incoming message into history
-            $data['history'][] = [
-                'direction' => 'in',
-                'text'      => $text,
-                'step'      => $conv->step,
-                'time'      => now()->toIso8601String(),
-            ];
-            $conv->data = $data;
-            $conv->save();
-
-            // 🔹 If flow is already completed
-            if ($conv->step === 'completed') {
-                $normalized = strtolower(trim($text));
-                $user = ConversationUser::where('phone1', $normalized)->first();
-                 $name = $user->name ?? 'Sir';
-                return "Hello " . $name . ", We already have your details. Thank you! If you want to start a new enquiry, just say *hi*.";
+        // If flow already completed, polite reply
+        if ($conv->step === 'completed') {
+            // try to find by the raw text (user might send number to re-open)
+            $digits = preg_replace('/\D+/', '', $text);
+            $user = null;
+            if ($digits) {
+                $user = ConversationUser::where('phone1', 'like', "%{$digits}%")
+                    ->orWhere('phone2', 'like', "%{$digits}%")
+                    ->first();
             }
-
-            // 1) FIRST TIME: start the flow
-            if (! $conv->step || $conv->step === 'start') {
-                $conv->step = 'completed';
-                 $conv->save();
-                return "Please type your phone number ";
-            }
+            $name = $user->name ?? ($conv->data['name'] ?? 'Sir');
+            return "Hello {$name}, we already have your details. Thank you! If you want to start a new enquiry, just say *hi*.";
         }
+
+        // 1) If starting and user greets ==> ask for phone
+        // match common greetings
+        if (! $conv->step || $conv->step === 'start') {
+            // detect greeting words (hi, hello, hey, hai, hiii, greetings)
+            if (preg_match('/\b(hi|hello|hey|hii|hai|helo|greetings)\b/i', $normalizedText)) {
+                $conv->step = 'awaiting_phone';
+                $conv->save();
+
+                // store prompt in history (outgoing)
+                $data = $conv->data ?? [];
+                $data['history'][] = [
+                    'direction' => 'out',
+                    'text'      => "Hi! Please type your phone number (include country code if possible).",
+                    'step'      => $conv->step,
+                    'time'      => now()->toIso8601String(),
+                ];
+                $conv->data = $data;
+                $conv->save();
+
+                return "Hi! Please type your phone number (include country code if possible).";
+            }
+
+            // If it isn't a greeting but we're at start, ask for greeting or phone (fallback)
+            $conv->step = 'awaiting_phone';
+            $conv->save();
+            return "Welcome! Please type your phone number (or say hi).";
+        }
+
+        // 2) We're waiting for phone number
+        if ($conv->step === 'awaiting_phone') {
+            // Normalize digits only
+            $digits = preg_replace('/\D+/', '', $text);
+
+            if (! $digits) {
+                return "I couldn't detect a phone number. Please send the number digits only, including country code (for example: +919876543210 or 9876543210).";
+            }
+
+            // Try multiple lookup strategies:
+            //  - exact match
+            //  - contains (handles stored numbers with or without country code)
+            $user = ConversationUser::where('phone1', $digits)
+                ->orWhere('phone2', $digits)
+                ->orWhere('phone1', 'like', "%{$digits}")
+                ->orWhere('phone2', 'like', "%{$digits}")
+                ->first();
+
+            if ($user) {
+                // Save name in conversation data for future quick replies
+                $conv->step = 'completed';
+                $data = $conv->data ?? [];
+                $data['name'] = $user->name;
+                $data['found_phone'] = $digits;
+                $data['history'][] = [
+                    'direction' => 'out',
+                    'text'      => "Hello {$user->name}, we found your record. How can we help you today?",
+                    'step'      => $conv->step,
+                    'time'      => now()->toIso8601String(),
+                ];
+                $conv->data = $data;
+                $conv->save();
+
+                return "Hello {$user->name}, we found your record. How can we help you today?";
+            }
+
+            // Not found
+            return "We couldn't find an account for that number. Please re-send your full phone number with country code (for example: +919876543210).";
+        }
+
+        // Default fallback
+        return "Sorry, I didn't understand. Please say *hi* to start or send your phone number.";
+    }
+
       
 
     
