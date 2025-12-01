@@ -77,7 +77,6 @@ class BotWebhookController extends Controller
             [
                 'step' => 'start',
                 'data' => [],
-                'phone' => $from,
             ]
         );
 
@@ -96,7 +95,7 @@ class BotWebhookController extends Controller
         $conversation->save();
 
         // 5) Send reply via WhatsApp Cloud API
-        $this->sendWhatsAppText($settings, $from, $reply);
+        $this->sendWhatsAppText($settings, $reply, $from);
 
         return response()->json(['status' => 'ok']);
     }
