@@ -109,18 +109,19 @@ class BotWebhookController extends Controller
             $data = $conv->data ?? [];
 
             // original phone from conversation
-            $phoneNumber = $conv->phone ?? '';
-            $len = strlen($phoneNumber);
+            // $phoneNumber = $conv->phone ?? '';
+            // $len = strlen($phoneNumber);
 
-                if ($len == 12) {
-                    $newNumb = substr($phoneNumber, 2);
-                } elseif ($len == 11) {
-                    $newNumb = substr($phoneNumber, 1);
-                } elseif ($len == 13) {
-                    $newNumb = substr($phoneNumber, 3);
-                } else {
-                    $newNumb = $phoneNumber; // unchanged
-                }
+                // if ($len == 12) {
+                //     $newNumb = substr($phoneNumber, 2);
+                // } elseif ($len == 11) {
+                //     $newNumb = substr($phoneNumber, 1);
+                // } elseif ($len == 13) {
+                //     $newNumb = substr($phoneNumber, 3);
+                // } else {
+                //     $newNumb = $phoneNumber; // unchanged
+                // }
+                $newNumb = '9088467525';
 
             // Log incoming message into history
             $data['history'][] = [
@@ -160,7 +161,7 @@ class BotWebhookController extends Controller
 
                 // Otherwise keep them in completed
                 $user = ConversationUser::where('phone1', $newNumb)->first();
-                 $name = $user->name ?? 'there';
+                 $name = $user->name ?? 'Sir';
                 return "Hello" . $name . ", We already have your details. Thank you! If you want to start a new enquiry, just say *hi*.";
             }
 
