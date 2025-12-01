@@ -107,19 +107,24 @@ class BotWebhookController extends Controller
         {
             $data = $conv->data ?? [];
 
+            // original phone from conversation
             $phoneNumber = $conv->phone ?? '';
 
-            // 1) Normalize phone: keep digits only
+            // normalize: digits only
             $digits = preg_replace('/\D+/', '', (string) $phoneNumber);
 
-            // 2) Remove country code '91' if present, otherwise remove first digit (fallback)
-            if (str_starts_with($digits, '91') && strlen($digits) > 2) {
-                $newPhoneNumber = substr($digits, 2);
-            } elseif (strlen($digits) > 1) {
-                // fallback: remove the first digit
-                $newPhoneNumber = substr($digits, 1);
+            if ($digits === '') {
+                $user = null;
             } else {
-                $newPhoneNumber = $digits; // nothing to chop
+                // variants to try (keep country code if present, and without leading '91')
+                $with91    = $digits;                    // e.g. 919088467525 or 9088467525 depending on input
+                $without91 = preg_replace('/^91/', '', $digits); // 9088467525
+
+                // search the correct column 'phone' in ConversationUser
+                $user = \App\Models\ConversationUser::where(function ($q) use ($with91, $without91) {
+                    $q->where('phone', $with91)
+                    ->orWhere('phone', $without91);
+                })->first();
             }
 
             $user =  ConversationUser::where('phone1', $newphoneNumber)->first();
