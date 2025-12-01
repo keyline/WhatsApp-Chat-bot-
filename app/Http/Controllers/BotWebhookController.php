@@ -82,7 +82,7 @@ class BotWebhookController extends Controller
         );
 
         // 4) Decide reply based on conversation state (DYNAMIC)
-        $reply = $this->getReplyForMessage($conversation, trim($text), $from);
+        $reply = $this->getReplyForMessage($conversation, trim($text));
 
         // 4b) Store outgoing reply in JSON history
         $data = $conversation->data ?? [];
@@ -96,7 +96,7 @@ class BotWebhookController extends Controller
         $conversation->save();
 
         // 5) Send reply via WhatsApp Cloud API
-        $this->sendWhatsAppText($settings, $reply);
+        $this->sendWhatsAppText($settings, $from, $reply);
 
         return response()->json(['status' => 'ok']);
     }
