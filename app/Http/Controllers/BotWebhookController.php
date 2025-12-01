@@ -109,19 +109,19 @@ class BotWebhookController extends Controller
             $data = $conv->data ?? [];
 
             // original phone from conversation
-            // $phoneNumber = $conv->phone ?? '';
-            // $len = strlen($phoneNumber);
+            $phoneNumber = $conv->phone ?? '';
+            $len = strlen($phoneNumber);
 
-                // if ($len == 12) {
-                //     $newNumb = substr($phoneNumber, 2);
-                // } elseif ($len == 11) {
-                //     $newNumb = substr($phoneNumber, 1);
-                // } elseif ($len == 13) {
-                //     $newNumb = substr($phoneNumber, 3);
-                // } else {
-                //     $newNumb = $phoneNumber; // unchanged
-                // }
-                $newNumb = '9088467525';
+                if ($len == 12) {
+                    $newNumb = substr($phoneNumber, 2);
+                } elseif ($len == 11) {
+                    $newNumb = substr($phoneNumber, 1);
+                } elseif ($len == 13) {
+                    $newNumb = substr($phoneNumber, 3);
+                } else {
+                    $newNumb = $phoneNumber; // unchanged
+                }
+               
 
             // Log incoming message into history
             $data['history'][] = [
@@ -136,7 +136,7 @@ class BotWebhookController extends Controller
             // 🔹 If flow is already completed
             if ($conv->step === 'completed') {
                 $normalized = strtolower(trim($text));
-
+                //  $newNumb = '9088467525';
                 // If user says "hi" → start a new enquiry
                 if ($normalized === 'hi' || $normalized === 'hello') {
                     $firstKey = 'ask_service';
