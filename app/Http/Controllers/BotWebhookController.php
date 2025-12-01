@@ -81,7 +81,7 @@ class BotWebhookController extends Controller
         );
 
         // 4) Decide reply based on conversation state (DYNAMIC)
-        $reply = $this->getReplyForMessage($conversation, trim($text));
+        $reply = $this->getReplyForMessage($conversation, trim($text), $from);
 
         // 4b) Store outgoing reply in JSON history
         $data = $conversation->data ?? [];
@@ -103,31 +103,23 @@ class BotWebhookController extends Controller
     /**
      * MAIN CHATBOT FLOW (now dynamic from DB)
      */
-        protected function getReplyForMessage(Conversation $conv, string $text): string
+        protected function getReplyForMessage(Conversation $conv, string $text, string $convPhone): string
         {
             $data = $conv->data ?? [];
 
             // original phone from conversation
-            // $phoneNumber = $conv->phone ?? '';
+            $phoneNumber = $convPhone ?? '';
+            $len = strlen($phoneNumber);
 
-            // normalize: digits only
-            // $digits = preg_replace('/\D+/', '', (string) $phoneNumber);
-
-            // if ($digits === '') {
-            //     $user = null;
-            // } else {
-            //     // variants to try (keep country code if present, and without leading '91')
-            //     $with91    = $digits;                    // e.g. 919088467525 or 9088467525 depending on input
-            //     $without91 = preg_replace('/^91/', '', $digits); // 9088467525
-
-            //     // search the correct column 'phone' in ConversationUser
-            //     $user = \App\Models\ConversationUser::where(function ($q) use ($with91, $without91) {
-            //         $q->where('phone', $with91)
-            //         ->orWhere('phone', $without91);
-            //     })->first();
-            // }
-
-            // $user =  ConversationUser::where('phone1', $newphoneNumber)->first();
+                if ($len == 12) {
+                    $newNumb = substr($phoneNumber, 2);
+                } elseif ($len == 11) {
+                    $newNumb = substr($phoneNumber, 1);
+                } elseif ($len == 13) {
+                    $newNumb = substr($phoneNumber, 3);
+                } else {
+                    $newNumb = $phoneNumber; // unchanged
+                }
 
             // Log incoming message into history
             $data['history'][] = [
@@ -166,8 +158,9 @@ class BotWebhookController extends Controller
                 }
 
                 // Otherwise keep them in completed
-                //  $name = $user->name ?? 'there';
-                return "We already have your details. Thank you! If you want to start a new enquiry, just say *hi*.";
+                $user = ConversationUser::where('phone1', $newNumb)->first();
+                 $name = $user->name ?? 'there';
+                return "Hello" . $name . ", We already have your details. Thank you! If you want to start a new enquiry, just say *hi*.";
             }
 
             // 1) FIRST TIME: start the flow
