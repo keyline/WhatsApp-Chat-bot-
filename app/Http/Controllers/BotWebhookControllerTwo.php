@@ -166,17 +166,17 @@ class BotWebhookControllerTwo extends Controller
                 $conv->save();
 
                 // store prompt in history (outgoing)
-                $data = $conv->data ?? [];
-                $data['history'][] = [
-                    'direction' => 'out',
-                    'text'      => "Hi! Please type your phone number (include country code if possible) or share your contact.",
-                    'step'      => $conv->step,
-                    'time'      => now()->toIso8601String(),
-                ];
-                $conv->data = $data;
-                $conv->save();
+                // $data = $conv->data ?? [];
+                // $data['history'][] = [
+                //     'direction' => 'out',
+                //     'text'      => "Hi! Please type your phone number.",
+                //     'step'      => $conv->step,
+                //     'time'      => now()->toIso8601String(),
+                // ];
+                // $conv->data = $data;
+                // $conv->save();
 
-                return "Hi! Please type your phone number (include country code if possible) or share your contact.";
+                return "Hi! Please type your phone number.";
             }
 
             // fallback at start: ask for greeting or phone
@@ -212,12 +212,12 @@ class BotWebhookControllerTwo extends Controller
                 $data = $conv->data ?? [];
                 $data['name'] = $user->name;
                 $data['found_phone'] = $digits;
-                $data['history'][] = [
-                    'direction' => 'out',
-                    'text'      => "Hello {$user->name}, we found your record. How can we help you today?",
-                    'step'      => $conv->step,
-                    'time'      => now()->toIso8601String(),
-                ];
+                // $data['history'][] = [
+                //     'direction' => 'out',
+                //     'text'      => "Hello {$user->name}, we found your record. How can we help you today?",
+                //     'step'      => $conv->step,
+                //     'time'      => now()->toIso8601String(),
+                // ];
                 $conv->data = $data;
                 $conv->save();
 
@@ -225,7 +225,7 @@ class BotWebhookControllerTwo extends Controller
             }
 
             // Not found — polite guidance
-            return "We couldn't find an account for that number. Please re-send your full phone number including country code (for example: +919876543210), or share your contact using WhatsApp.";
+            return "We couldn't find an account for that number. Please re-send your full phone number (for example: 9876543210)"; 
         }
 
         // default fallback
