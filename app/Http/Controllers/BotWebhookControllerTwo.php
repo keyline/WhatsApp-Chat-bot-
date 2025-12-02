@@ -148,7 +148,7 @@ class BotWebhookControllerTwo extends Controller
         if ($conv->step === 'completed') {
             if (preg_match('/\b(hi|hello|hey|hii|hai)\b/i', $normalizedText)) {
                 // restart flow for new enquiry
-                $conv->step = 'start';
+                $conv->step = 'awaiting_phone';
                 $conv->save();
                 // Ask for phone again
                 return "Hi again! Please type your phone number (include country code if possible).";
